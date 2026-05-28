@@ -7,12 +7,26 @@ import {
   calculateWeightedDriverScoresFromPlayers,
   createInitialGridState,
   generateActions,
-  rollForDisaster,
+  selectScenario,
+  scenarioToDisaster,
   applyDisasterDamage,
   progressQuarter,
   calculateFinalScore,
 } from "@/lib/game-engine";
-import type { DriverKey, DriverScores, GridState } from "@/lib/types";
+import type { DriverKey, DriverScores, GridState, Scenario } from "@/lib/types";
+
+/**
+ * Extract all scenario IDs that have been used in previous quarters from the events log.
+ * We store scenario IDs in event descriptions prefixed with "SCENARIO:" for tracking.
+ */
+function getUsedScenarioIds(events: Array<{ description: string }>): string[] {
+  const ids: string[] = [];
+  for (const e of events) {
+    const match = e.description.match(/\[scenario:([^\]]+)\]/);
+    if (match) ids.push(match[1]);
+  }
+  return ids;
+}
 
 // POST /api/game/admin — admin control actions
 export async function POST(req: Request) {
@@ -95,7 +109,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true, phase: "results" });
       }
 
-      // Admin starts the game from results
+      // Admin starts the game from results — initialise grid and present first scenario
       case "start-game": {
         if (g.phase !== "results") {
           return NextResponse.json(
@@ -123,19 +137,21 @@ export async function POST(req: Request) {
 
         const grid = createInitialGridState(avgWTP, playerCount);
         const driverHealth: DriverScores = {
-          growthDemand: Math.min(
-            60,
-            weightedScores.growthDemand + 30
-          ),
+          growthDemand: Math.min(60, weightedScores.growthDemand + 30),
           ageingAssets: Math.min(50, weightedScores.ageingAssets + 20),
-          gridResilience: Math.min(
-            55,
-            weightedScores.gridResilience + 25
-          ),
+          gridResilience: Math.min(55, weightedScores.gridResilience + 25),
           innovation: Math.min(40, weightedScores.innovation + 15),
           reliability: Math.min(65, weightedScores.reliability + 35),
         };
         const actions = generateActions(weightedScores, 1, grid);
+
+        // Select the first scenario to present to players
+        const scenario = selectScenario(1, g.maxQuarters, []);
+
+        // Apply scenario damage to the grid immediately
+        const disaster = scenarioToDisaster(scenario);
+        const { grid: damagedGrid, driverHealth: damagedHealth } =
+          applyDisasterDamage(grid, driverHealth, disaster);
 
         const events = [
           {
@@ -145,6 +161,12 @@ export async function POST(req: Request) {
             type: "achievement",
             icon: "🏙️",
           },
+          {
+            quarter: 1,
+            description: `SCENARIO: ${scenario.name} — ${scenario.headline} [scenario:${scenario.id}]`,
+            type: "disaster",
+            icon: scenario.icon,
+          },
         ];
 
         await db
@@ -152,11 +174,12 @@ export async function POST(req: Request) {
           .set({
             phase: "playing",
             quarter: 1,
-            gridState: JSON.stringify(grid),
-            driverHealth: JSON.stringify(driverHealth),
+            gridState: JSON.stringify(damagedGrid),
+            driverHealth: JSON.stringify(damagedHealth),
             availableActions: JSON.stringify(actions),
             events: JSON.stringify(events),
-            activeDisaster: null,
+            activeDisaster: JSON.stringify(disaster),
+            activeScenario: JSON.stringify(scenario),
             score: 0,
           })
           .where(eq(games.id, code));
@@ -164,7 +187,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true, phase: "playing" });
       }
 
-      // Admin advances to next quarter (after all players have submitted)
+      // Admin advances to next quarter — apply progression, present new scenario
       case "advance-quarter": {
         if (g.phase !== "playing") {
           return NextResponse.json(
@@ -180,24 +203,17 @@ export async function POST(req: Request) {
           const gridState: GridState = JSON.parse(g.gridState!);
           const drvHealth: DriverScores = JSON.parse(g.driverHealth!);
           const wScores: DriverScores = JSON.parse(g.weightedScores!);
-          const finalScore = calculateFinalScore(
-            gridState,
-            drvHealth,
-            wScores
-          );
+          const finalScore = calculateFinalScore(gridState, drvHealth, wScores);
 
           await db
             .update(games)
-            .set({
-              phase: "game-over",
-              score: finalScore,
-            })
+            .set({ phase: "game-over", score: finalScore })
             .where(eq(games.id, code));
 
           return NextResponse.json({ ok: true, phase: "game-over" });
         }
 
-        // Progress the quarter
+        // Progress the quarter (population growth, revenue, opex, asset aging)
         const gridState: GridState = JSON.parse(g.gridState!);
         const drvHealth: DriverScores = JSON.parse(g.driverHealth!);
         const wScores: DriverScores = JSON.parse(g.weightedScores!);
@@ -208,30 +224,32 @@ export async function POST(req: Request) {
           events: quarterEvents,
         } = progressQuarter(gridState, drvHealth, nextQuarter);
 
-        // Roll for disaster
-        const disaster = rollForDisaster(nextQuarter);
-        let finalGrid = progressedGrid;
-        let finalHealth = progressedHealth;
+        // Select a new scenario for this quarter
         const existingEvents = g.events ? JSON.parse(g.events) : [];
-        const allEvents = [...existingEvents, ...quarterEvents];
+        const usedIds = getUsedScenarioIds(existingEvents);
+        const scenario: Scenario = selectScenario(
+          nextQuarter,
+          g.maxQuarters,
+          usedIds
+        );
 
-        if (disaster) {
-          const dmg = applyDisasterDamage(
-            progressedGrid,
-            progressedHealth,
-            disaster
-          );
-          finalGrid = dmg.grid;
-          finalHealth = dmg.driverHealth;
-          allEvents.push({
+        // Apply scenario damage
+        const disaster = scenarioToDisaster(scenario);
+        const { grid: damagedGrid, driverHealth: damagedHealth } =
+          applyDisasterDamage(progressedGrid, progressedHealth, disaster);
+
+        const allEvents = [
+          ...existingEvents,
+          ...quarterEvents,
+          {
             quarter: nextQuarter,
-            description: `DISASTER: ${disaster.name} — ${disaster.description}`,
+            description: `SCENARIO: ${scenario.name} — ${scenario.headline} [scenario:${scenario.id}]`,
             type: "disaster",
-            icon: disaster.icon,
-          });
-        }
+            icon: scenario.icon,
+          },
+        ];
 
-        const newActions = generateActions(wScores, nextQuarter, finalGrid);
+        const newActions = generateActions(wScores, nextQuarter, damagedGrid);
 
         // Reset all players' action submitted status
         const allPlayers = await db
@@ -250,10 +268,11 @@ export async function POST(req: Request) {
           .update(games)
           .set({
             quarter: nextQuarter,
-            gridState: JSON.stringify(finalGrid),
-            driverHealth: JSON.stringify(finalHealth),
+            gridState: JSON.stringify(damagedGrid),
+            driverHealth: JSON.stringify(damagedHealth),
             events: JSON.stringify(allEvents),
-            activeDisaster: disaster ? JSON.stringify(disaster) : null,
+            activeDisaster: JSON.stringify(disaster),
+            activeScenario: JSON.stringify(scenario),
             availableActions: JSON.stringify(newActions),
           })
           .where(eq(games.id, code));
@@ -261,7 +280,7 @@ export async function POST(req: Request) {
         return NextResponse.json({
           ok: true,
           quarter: nextQuarter,
-          disaster: disaster?.name ?? null,
+          scenario: scenario.name,
         });
       }
 
@@ -293,10 +312,7 @@ export async function POST(req: Request) {
 
         await db
           .update(games)
-          .set({
-            phase: "game-over",
-            score: finalScore,
-          })
+          .set({ phase: "game-over", score: finalScore })
           .where(eq(games.id, code));
 
         return NextResponse.json({ ok: true, phase: "game-over" });

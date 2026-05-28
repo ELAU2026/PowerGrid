@@ -31,6 +31,16 @@ interface GameStateResponse {
       icon: string;
     }>;
     activeDisaster: { name: string; icon: string; severity: string; description: string } | null;
+    activeScenario: {
+      id: string;
+      name: string;
+      icon: string;
+      severity: string;
+      headline: string;
+      customerImpact: string;
+      decisionPrompt: string;
+      category: string;
+    } | null;
     score: number;
   };
   players: Array<{
@@ -423,28 +433,39 @@ function AdminContent() {
               </div>
             )}
 
-            {/* Disaster */}
-            {g.activeDisaster && (
+            {/* Active Scenario */}
+            {g.activeScenario && (
               <div className="bg-red-900/30 border border-red-500/50 rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xl">{g.activeDisaster.icon}</span>
-                  <span className="text-red-300 font-bold text-sm">
-                    {g.activeDisaster.name}
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xl">{g.activeScenario.icon}</span>
+                  <span className="text-red-300 font-bold text-sm flex-1">
+                    {g.activeScenario.name}
                   </span>
                   <span
-                    className={`ml-auto px-2 py-0.5 rounded text-xs font-bold uppercase ${
-                      g.activeDisaster.severity === "catastrophic"
+                    className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${
+                      g.activeScenario.severity === "catastrophic"
                         ? "bg-red-600 text-white"
-                        : g.activeDisaster.severity === "severe"
+                        : g.activeScenario.severity === "severe"
                           ? "bg-orange-600 text-white"
-                          : "bg-yellow-600 text-slate-900"
+                          : g.activeScenario.severity === "moderate"
+                            ? "bg-yellow-600 text-slate-900"
+                            : "bg-blue-600 text-white"
                     }`}
                   >
-                    {g.activeDisaster.severity}
+                    {g.activeScenario.severity}
                   </span>
                 </div>
-                <p className="text-red-400/80 text-xs">
-                  {g.activeDisaster.description}
+                <p className="text-red-400/80 text-xs mb-1.5">
+                  {g.activeScenario.headline}
+                </p>
+                <div className="bg-black/20 rounded-lg p-2 mb-1.5">
+                  <div className="text-amber-400 text-xs font-bold mb-0.5">Customer Impact:</div>
+                  <p className="text-slate-300 text-xs leading-relaxed">
+                    {g.activeScenario.customerImpact}
+                  </p>
+                </div>
+                <p className="text-amber-300 text-xs italic">
+                  &ldquo;{g.activeScenario.decisionPrompt}&rdquo;
                 </p>
               </div>
             )}
@@ -604,8 +625,127 @@ function AnalyticsPanel({ analytics }: { analytics: GameAnalytics }) {
             value={analytics.correlations.budgetEfficiency}
             description="Does spending align with stated priorities?"
           />
+          <CorrelationRow
+            label="Scenario Responsiveness"
+            value={analytics.correlations.scenarioResponsiveness}
+            description="Do customers respond to crisis scenarios with relevant actions?"
+          />
         </div>
       </div>
+
+      {/* Scenario Responsiveness */}
+      {analytics.scenarioResponses.length > 0 && (
+        <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-4">
+          <h2 className="text-white font-semibold text-sm mb-3 uppercase tracking-wide">
+            Scenario Responsiveness
+          </h2>
+          <p className="text-slate-400 text-xs mb-3">
+            Each quarter, players were presented with a scenario and asked to choose
+            an action. Green = addressed the scenario. Orange = chose something unrelated.
+          </p>
+          <div className="space-y-2.5">
+            {analytics.scenarioResponses.map((sr) => (
+              <div key={`${sr.scenarioId}-${sr.quarter}`} className="bg-slate-700/30 rounded-lg p-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <span>{sr.scenarioIcon}</span>
+                    <span className="text-white text-xs font-semibold">
+                      {sr.scenarioName}
+                    </span>
+                    <span className="text-slate-500 text-xs">Q{sr.quarter}</span>
+                  </div>
+                  <span
+                    className={`text-xs font-bold px-2 py-0.5 rounded ${
+                      sr.responsivenessRate >= 0.7
+                        ? "bg-emerald-500/20 text-emerald-400"
+                        : sr.responsivenessRate >= 0.4
+                          ? "bg-yellow-500/20 text-yellow-400"
+                          : "bg-red-500/20 text-red-400"
+                    }`}
+                  >
+                    {Math.round(sr.responsivenessRate * 100)}% responsive
+                  </span>
+                </div>
+                <div className="flex gap-1 h-3 rounded-full overflow-hidden bg-slate-700 mb-1.5">
+                  {sr.responsiveCount > 0 && (
+                    <div
+                      className="bg-emerald-500 transition-all"
+                      style={{
+                        width: `${(sr.responsiveCount / (sr.responsiveCount + sr.unresponsiveCount + sr.skippedCount)) * 100}%`,
+                      }}
+                    />
+                  )}
+                  {sr.unresponsiveCount > 0 && (
+                    <div
+                      className="bg-orange-500 transition-all"
+                      style={{
+                        width: `${(sr.unresponsiveCount / (sr.responsiveCount + sr.unresponsiveCount + sr.skippedCount)) * 100}%`,
+                      }}
+                    />
+                  )}
+                  {sr.skippedCount > 0 && (
+                    <div
+                      className="bg-slate-600 transition-all"
+                      style={{
+                        width: `${(sr.skippedCount / (sr.responsiveCount + sr.unresponsiveCount + sr.skippedCount)) * 100}%`,
+                      }}
+                    />
+                  )}
+                </div>
+                <div className="flex gap-3 text-xs text-slate-500">
+                  <span>
+                    <span className="inline-block w-2 h-2 rounded-sm bg-emerald-500 mr-1" />
+                    Responsive ({sr.responsiveCount})
+                  </span>
+                  <span>
+                    <span className="inline-block w-2 h-2 rounded-sm bg-orange-500 mr-1" />
+                    Unrelated ({sr.unresponsiveCount})
+                  </span>
+                  <span>
+                    <span className="inline-block w-2 h-2 rounded-sm bg-slate-600 mr-1" />
+                    Skipped ({sr.skippedCount})
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Player Responsiveness */}
+      {analytics.playerResponsiveness.length > 0 && (
+        <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-4">
+          <h2 className="text-white font-semibold text-sm mb-3 uppercase tracking-wide">
+            Player Responsiveness
+          </h2>
+          <div className="space-y-2">
+            {analytics.playerResponsiveness.map((pr) => (
+              <div
+                key={pr.playerId}
+                className="flex items-center justify-between bg-slate-700/30 rounded-lg px-3 py-2"
+              >
+                <div>
+                  <span className="text-white text-sm">{pr.name}</span>
+                  <div className="text-slate-500 text-xs">
+                    {pr.responsiveCount} responsive / {pr.unresponsiveCount} unrelated / {pr.skippedCount} skipped
+                  </div>
+                </div>
+                <span
+                  className={`text-sm font-bold ${
+                    pr.responsivenessRate >= 0.7
+                      ? "text-emerald-400"
+                      : pr.responsivenessRate >= 0.4
+                        ? "text-yellow-400"
+                        : "text-red-400"
+                  }`}
+                >
+                  {Math.round(pr.responsivenessRate * 100)}%
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Per-player stated vs revealed */}
       <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-4">

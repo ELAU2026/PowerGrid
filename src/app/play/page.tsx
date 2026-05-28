@@ -36,6 +36,18 @@ interface GameData {
       severity: string;
       description: string;
     } | null;
+    activeScenario: {
+      id: string;
+      name: string;
+      icon: string;
+      severity: string;
+      headline: string;
+      customerImpact: string;
+      decisionPrompt: string;
+      damageType: DriverKey[];
+      relevantActionIds: string[];
+      category: string;
+    } | null;
     availableActions: QuarterAction[];
     score: number;
   };
@@ -499,17 +511,48 @@ function PlayerContent() {
             )}
           </div>
 
-          {/* Disaster */}
-          {g.activeDisaster && (
-            <div className="bg-red-900/40 border border-red-500/50 rounded-xl p-3 mb-3 flex items-center gap-2">
-              <span className="text-2xl">{g.activeDisaster.icon}</span>
-              <div className="flex-1 min-w-0">
-                <div className="text-red-300 font-bold text-sm">
-                  {g.activeDisaster.name}
+          {/* Scenario Card — the core behavioural test */}
+          {g.activeScenario && (
+            <div className="bg-gradient-to-br from-red-900/40 to-orange-900/30 border border-red-500/40 rounded-2xl p-5 mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-3xl">{g.activeScenario.icon}</span>
+                <div className="flex-1">
+                  <div className="text-red-200 font-bold text-base">
+                    {g.activeScenario.name}
+                  </div>
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded-full font-bold uppercase ${
+                      g.activeScenario.severity === "catastrophic"
+                        ? "bg-red-600 text-white"
+                        : g.activeScenario.severity === "severe"
+                          ? "bg-orange-600 text-white"
+                          : g.activeScenario.severity === "moderate"
+                            ? "bg-yellow-600 text-slate-900"
+                            : "bg-blue-600 text-white"
+                    }`}
+                  >
+                    {g.activeScenario.severity}
+                  </span>
                 </div>
-                <div className="text-red-400/70 text-xs truncate">
-                  {g.activeDisaster.description}
+              </div>
+
+              <p className="text-red-100/90 text-sm mb-3 leading-relaxed">
+                {g.activeScenario.headline}
+              </p>
+
+              <div className="bg-black/20 rounded-xl p-3 mb-3">
+                <div className="text-amber-400 text-xs font-bold uppercase tracking-wide mb-1">
+                  Impact on You
                 </div>
+                <p className="text-slate-200 text-sm leading-relaxed">
+                  {g.activeScenario.customerImpact}
+                </p>
+              </div>
+
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
+                <p className="text-amber-300 text-sm font-medium italic">
+                  &ldquo;{g.activeScenario.decisionPrompt}&rdquo;
+                </p>
               </div>
             </div>
           )}
@@ -794,6 +837,80 @@ function PlayerContent() {
               </div>
             </div>
           )}
+
+          {/* Scenario Responsiveness */}
+          {data.analytics && (() => {
+            const myResp = data.analytics!.playerResponsiveness.find(
+              (p) => p.playerId === data.currentPlayerId
+            );
+            if (!myResp || myResp.totalScenarios === 0) return null;
+            return (
+              <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-5 mb-4">
+                <h2 className="text-white font-semibold mb-3">
+                  Your Scenario Responsiveness
+                </h2>
+                <p className="text-slate-400 text-xs mb-3">
+                  When presented with a crisis scenario, did you invest in actions that
+                  directly addressed it?
+                </p>
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  <div className="text-center bg-slate-700/40 rounded-lg p-3">
+                    <div className="text-2xl font-black text-emerald-400">
+                      {Math.round(myResp.responsivenessRate * 100)}%
+                    </div>
+                    <div className="text-slate-400 text-xs">Responsive</div>
+                  </div>
+                  <div className="text-center bg-slate-700/40 rounded-lg p-3">
+                    <div className="text-2xl font-bold text-emerald-400">
+                      {myResp.responsiveCount}
+                    </div>
+                    <div className="text-slate-400 text-xs">Addressed</div>
+                  </div>
+                  <div className="text-center bg-slate-700/40 rounded-lg p-3">
+                    <div className="text-2xl font-bold text-orange-400">
+                      {myResp.unresponsiveCount}
+                    </div>
+                    <div className="text-slate-400 text-xs">Unrelated</div>
+                  </div>
+                </div>
+                {Object.keys(myResp.byCategory).length > 0 && (
+                  <div>
+                    <div className="text-slate-300 text-xs font-semibold mb-2">
+                      By Scenario Type
+                    </div>
+                    <div className="space-y-1.5">
+                      {Object.entries(myResp.byCategory).map(([cat, data]) => (
+                        <div
+                          key={cat}
+                          className="flex items-center justify-between bg-slate-700/30 rounded-lg px-3 py-1.5"
+                        >
+                          <span className="text-slate-300 text-xs capitalize">
+                            {cat}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-slate-500 text-xs">
+                              {data.responsive}/{data.total}
+                            </span>
+                            <span
+                              className={`text-xs font-bold ${
+                                data.rate >= 0.7
+                                  ? "text-emerald-400"
+                                  : data.rate >= 0.4
+                                    ? "text-yellow-400"
+                                    : "text-red-400"
+                              }`}
+                            >
+                              {Math.round(data.rate * 100)}%
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Segments */}
           {data.analytics && (

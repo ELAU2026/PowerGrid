@@ -5,9 +5,10 @@
  * 1. Stated vs revealed preferences (what they said matters vs what they invested in)
  * 2. Customer segmentation based on behavioural patterns
  * 3. Action-outcome correlations
+ * 4. Scenario responsiveness — did players respond to the scenario presented to them?
  */
 
-import { type DriverKey, DRIVERS } from "./types";
+import { type DriverKey, DRIVERS, SCENARIOS } from "./types";
 
 export interface PlayerAnalytics {
   playerId: number;
@@ -44,14 +45,54 @@ export interface SegmentProfile {
   statedVsRevealedGap: number; // how much stated differs from revealed (0=aligned, higher=more gap)
 }
 
+/** Per-scenario breakdown of how players responded */
+export interface ScenarioResponse {
+  scenarioId: string;
+  scenarioName: string;
+  scenarioIcon: string;
+  scenarioCategory: string;
+  quarter: number;
+  /** How many players chose a relevant (responsive) action */
+  responsiveCount: number;
+  /** How many players chose an unrelated action */
+  unresponsiveCount: number;
+  /** How many players skipped */
+  skippedCount: number;
+  /** Responsiveness rate: responsive / (responsive + unresponsive) */
+  responsivenessRate: number;
+  /** Breakdown: which actions were chosen in response to this scenario */
+  actionBreakdown: Array<{
+    actionId: string;
+    actionName: string;
+    count: number;
+    isResponsive: boolean;
+  }>;
+}
+
+/** Per-player scenario responsiveness summary */
+export interface PlayerResponsiveness {
+  playerId: number;
+  name: string;
+  totalScenarios: number;
+  responsiveCount: number;
+  unresponsiveCount: number;
+  skippedCount: number;
+  responsivenessRate: number; // 0-1
+  /** Category-level responsiveness */
+  byCategory: Record<string, { responsive: number; total: number; rate: number }>;
+}
+
 export interface GameAnalytics {
   players: PlayerAnalytics[];
   segments: SegmentProfile[];
   actionOutcomes: ActionOutcome[];
+  scenarioResponses: ScenarioResponse[];
+  playerResponsiveness: PlayerResponsiveness[];
   correlations: {
     willingnessVsActions: number; // correlation between WTP and action count
     statedVsRevealed: number; // avg alignment across all players
     budgetEfficiency: number; // how well spending matched stated priorities
+    scenarioResponsiveness: number; // overall average responsiveness rate
   };
 }
 
@@ -221,6 +262,7 @@ export function computeGameAnalytics(
     actionDriver: string;
     actionEffect: Record<string, number>;
     quarter: number;
+    scenarioId: string | null;
   }>
 ): GameAnalytics {
   // 1. Compute per-player spend by driver
@@ -400,14 +442,163 @@ export function computeGameAnalytics(
   const budgetEfficiency =
     playerAnalytics.length > 0 ? totalEff / playerAnalytics.length : 0;
 
+  // 5. Scenario Responsiveness Analysis
+  // Group actions by scenario, check if the chosen action was "relevant" to the scenario
+  const scenarioQuarterMap = new Map<string, { scenarioId: string; quarter: number }>();
+  for (const a of actions) {
+    if (a.scenarioId && !scenarioQuarterMap.has(`${a.scenarioId}-${a.quarter}`)) {
+      scenarioQuarterMap.set(`${a.scenarioId}-${a.quarter}`, {
+        scenarioId: a.scenarioId,
+        quarter: a.quarter,
+      });
+    }
+  }
+
+  const scenarioResponses: ScenarioResponse[] = [];
+  const playerScenarioTracker = new Map<
+    number,
+    { responsive: number; unresponsive: number; skipped: number; byCategory: Map<string, { responsive: number; total: number }> }
+  >();
+
+  // Initialise player tracker
+  for (const p of playersData) {
+    playerScenarioTracker.set(p.id, {
+      responsive: 0,
+      unresponsive: 0,
+      skipped: 0,
+      byCategory: new Map(),
+    });
+  }
+
+  // For each unique scenario presented in the game
+  const processedScenarios = new Set<string>();
+  for (const { scenarioId, quarter } of scenarioQuarterMap.values()) {
+    const scenarioDef = SCENARIOS.find((s) => s.id === scenarioId);
+    if (!scenarioDef || processedScenarios.has(`${scenarioId}-${quarter}`)) continue;
+    processedScenarios.add(`${scenarioId}-${quarter}`);
+
+    const relevantIds = new Set(scenarioDef.relevantActionIds);
+    const actionsThisQuarter = actions.filter(
+      (a) => a.quarter === quarter && a.scenarioId === scenarioId
+    );
+
+    // Players who acted this quarter
+    const actedPlayerIds = new Set(actionsThisQuarter.map((a) => a.playerId));
+    // Players who didn't act = skipped
+    const skippedPlayerIds = playersData
+      .map((p) => p.id)
+      .filter((id) => !actedPlayerIds.has(id));
+
+    let responsiveCount = 0;
+    let unresponsiveCount = 0;
+
+    const actionBreakdown = new Map<string, { name: string; count: number; isResponsive: boolean }>();
+
+    for (const a of actionsThisQuarter) {
+      const isResp = relevantIds.has(a.actionId);
+      if (isResp) responsiveCount++;
+      else unresponsiveCount++;
+
+      if (!actionBreakdown.has(a.actionId)) {
+        actionBreakdown.set(a.actionId, {
+          name: a.actionName,
+          count: 0,
+          isResponsive: isResp,
+        });
+      }
+      actionBreakdown.get(a.actionId)!.count++;
+
+      // Track per-player
+      const tracker = playerScenarioTracker.get(a.playerId);
+      if (tracker) {
+        if (isResp) tracker.responsive++;
+        else tracker.unresponsive++;
+
+        const cat = scenarioDef.category;
+        if (!tracker.byCategory.has(cat)) {
+          tracker.byCategory.set(cat, { responsive: 0, total: 0 });
+        }
+        const catTrack = tracker.byCategory.get(cat)!;
+        catTrack.total++;
+        if (isResp) catTrack.responsive++;
+      }
+    }
+
+    // Track skips
+    for (const pid of skippedPlayerIds) {
+      const tracker = playerScenarioTracker.get(pid);
+      if (tracker) tracker.skipped++;
+    }
+
+    const total = responsiveCount + unresponsiveCount;
+    scenarioResponses.push({
+      scenarioId,
+      scenarioName: scenarioDef.name,
+      scenarioIcon: scenarioDef.icon,
+      scenarioCategory: scenarioDef.category,
+      quarter,
+      responsiveCount,
+      unresponsiveCount,
+      skippedCount: skippedPlayerIds.length,
+      responsivenessRate: total > 0 ? Math.round((responsiveCount / total) * 100) / 100 : 0,
+      actionBreakdown: Array.from(actionBreakdown.entries()).map(
+        ([actionId, data]) => ({
+          actionId,
+          actionName: data.name,
+          count: data.count,
+          isResponsive: data.isResponsive,
+        })
+      ),
+    });
+  }
+
+  // Per-player responsiveness
+  const playerResponsiveness: PlayerResponsiveness[] = playersData.map((p) => {
+    const tracker = playerScenarioTracker.get(p.id) ?? {
+      responsive: 0,
+      unresponsive: 0,
+      skipped: 0,
+      byCategory: new Map(),
+    };
+    const total = tracker.responsive + tracker.unresponsive;
+    const byCategory: Record<string, { responsive: number; total: number; rate: number }> = {};
+    for (const [cat, data] of tracker.byCategory.entries()) {
+      byCategory[cat] = {
+        responsive: data.responsive,
+        total: data.total,
+        rate: data.total > 0 ? Math.round((data.responsive / data.total) * 100) / 100 : 0,
+      };
+    }
+
+    return {
+      playerId: p.id,
+      name: p.name,
+      totalScenarios: total + tracker.skipped,
+      responsiveCount: tracker.responsive,
+      unresponsiveCount: tracker.unresponsive,
+      skippedCount: tracker.skipped,
+      responsivenessRate: total > 0 ? Math.round((tracker.responsive / total) * 100) / 100 : 0,
+      byCategory,
+    };
+  });
+
+  const overallResponsiveness =
+    playerResponsiveness.length > 0
+      ? playerResponsiveness.reduce((s, p) => s + p.responsivenessRate, 0) /
+        playerResponsiveness.length
+      : 0;
+
   return {
     players: playerAnalytics,
     segments,
     actionOutcomes,
+    scenarioResponses,
+    playerResponsiveness,
     correlations: {
       willingnessVsActions: Math.round(willingnessVsActions * 100) / 100,
       statedVsRevealed: Math.round(statedVsRevealed * 100) / 100,
       budgetEfficiency: Math.round(budgetEfficiency * 100) / 100,
+      scenarioResponsiveness: Math.round(overallResponsiveness * 100) / 100,
     },
   };
 }

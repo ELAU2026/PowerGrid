@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { games, players, actionLog } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { applyAction } from "@/lib/game-engine";
-import type { DriverScores, GridState, QuarterAction } from "@/lib/types";
+import type { DriverScores, GridState, QuarterAction, Scenario } from "@/lib/types";
 
 // POST /api/game/action — player submits their action for this quarter
 export async function POST(req: Request) {
@@ -108,7 +108,11 @@ export async function POST(req: Request) {
       icon: "✅",
     });
 
-    // Save action log for analytics
+    // Save action log for analytics — include which scenario was active
+    const activeScenario: Scenario | null = g.activeScenario
+      ? JSON.parse(g.activeScenario)
+      : null;
+
     await db.insert(actionLog).values({
       gameId: code,
       playerId: p.id,
@@ -118,6 +122,7 @@ export async function POST(req: Request) {
       actionCost: action.cost,
       actionDriver: action.driver,
       actionEffect: JSON.stringify(action.effect),
+      scenarioId: activeScenario?.id ?? null,
     });
 
     // Update game state and mark player as submitted

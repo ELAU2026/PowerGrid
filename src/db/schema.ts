@@ -16,6 +16,7 @@ export const games = sqliteTable("games", {
   averageWillingness: real("average_willingness").default(0),
   events: text("events"), // JSON GameEvent[]
   activeDisaster: text("active_disaster"), // JSON Disaster | null
+  activeScenario: text("active_scenario"), // JSON Scenario — the scenario presented this quarter
   availableActions: text("available_actions"), // JSON QuarterAction[]
   score: integer("score").default(0),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(
@@ -58,6 +59,7 @@ export const actionLog = sqliteTable("action_log", {
   actionCost: real("action_cost").notNull(),
   actionDriver: text("action_driver").notNull(), // DriverKey
   actionEffect: text("action_effect").notNull(), // JSON
+  scenarioId: text("scenario_id"), // which scenario was active when this action was taken
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(
     () => new Date()
   ),

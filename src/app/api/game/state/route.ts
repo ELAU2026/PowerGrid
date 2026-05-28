@@ -88,6 +88,7 @@ export async function GET(req: Request) {
         actionDriver: a.actionDriver,
         actionEffect: JSON.parse(a.actionEffect) as Record<string, number>,
         quarter: a.quarter,
+        scenarioId: a.scenarioId ?? null,
       }));
 
       analytics = computeGameAnalytics(
@@ -112,6 +113,9 @@ export async function GET(req: Request) {
         events: g.events ? JSON.parse(g.events) : [],
         activeDisaster: g.activeDisaster
           ? JSON.parse(g.activeDisaster)
+          : null,
+        activeScenario: g.activeScenario
+          ? JSON.parse(g.activeScenario)
           : null,
         availableActions: g.availableActions
           ? JSON.parse(g.availableActions)

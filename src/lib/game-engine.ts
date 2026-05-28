@@ -5,10 +5,12 @@ import {
   type GridState,
   type QuarterAction,
   type Disaster,
+  type Scenario,
   type GameEvent,
   type GridAsset,
   INITIAL_DRIVER_SCORES,
   DISASTERS,
+  SCENARIOS,
 } from "./types";
 
 // === Scoring ===
@@ -353,16 +355,68 @@ export function generateActions(
   return [...baseActions, ...emergencyActions];
 }
 
-// === Disasters ===
+// === Scenarios & Disasters ===
 
+/**
+ * Select a scenario for this quarter. Every quarter gets a scenario — this is
+ * core to the behavioural economics testing. The scenario is what frames the
+ * player's decision and lets us measure whether they respond to it.
+ *
+ * Severity escalates as the game progresses, and we avoid repeating recent
+ * scenarios by tracking which IDs were already used.
+ */
+export function selectScenario(
+  quarter: number,
+  maxQuarters: number,
+  usedScenarioIds: string[]
+): Scenario {
+  // Determine target severity based on game progression
+  const progress = quarter / maxQuarters;
+  const severityPool: Scenario["severity"][] =
+    progress < 0.25
+      ? ["minor", "moderate"]
+      : progress < 0.5
+        ? ["moderate", "severe"]
+        : progress < 0.75
+          ? ["moderate", "severe", "catastrophic"]
+          : ["severe", "catastrophic"];
+
+  // Filter to unused scenarios matching target severity, fall back to any unused
+  let candidates = SCENARIOS.filter(
+    (s) => !usedScenarioIds.includes(s.id) && severityPool.includes(s.severity)
+  );
+  if (candidates.length === 0) {
+    candidates = SCENARIOS.filter(
+      (s) => !usedScenarioIds.includes(s.id)
+    );
+  }
+  if (candidates.length === 0) {
+    // All scenarios used — reset and pick any matching severity
+    candidates = SCENARIOS.filter((s) => severityPool.includes(s.severity));
+    if (candidates.length === 0) candidates = [...SCENARIOS];
+  }
+
+  return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
+/** Convert a Scenario to a legacy Disaster for damage application */
+export function scenarioToDisaster(s: Scenario): Disaster {
+  return {
+    id: s.id,
+    name: s.name,
+    description: s.headline,
+    severity: s.severity,
+    damageType: s.damageType,
+    icon: s.icon,
+  };
+}
+
+/** Legacy random roll — kept for backward compat but no longer the primary path */
 export function rollForDisaster(quarter: number): Disaster | null {
-  // Chance increases as game progresses
   const baseChance = 0.25;
   const quarterBonus = quarter * 0.03;
   const chance = Math.min(baseChance + quarterBonus, 0.7);
-
   if (Math.random() > chance) return null;
-
   const idx = Math.floor(Math.random() * DISASTERS.length);
   return DISASTERS[idx];
 }
