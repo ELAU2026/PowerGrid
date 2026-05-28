@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Next.js Template",
-  description: "A minimal Next.js starter template",
+  title: "PowerGrid WSA — Western Sydney Power Grid Game",
+  description:
+    "A turn-based multiplayer game where customers build and maintain a power grid for Western Sydney's growing Aerotropolis",
 };
 
 export default function RootLayout({
