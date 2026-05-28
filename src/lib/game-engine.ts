@@ -1,5 +1,4 @@
 import {
-  type GameState,
   type PlayerSetup,
   type DriverScores,
   type DriverKey,
@@ -42,6 +41,55 @@ export function calculateWeightedDriverScores(players: PlayerSetup[]): DriverSco
   for (const key of keys) {
     let weightedSum = 0;
     for (const player of submitted) {
+      const weight = player.willingnessToPay / totalWillingness;
+      weightedSum += player.driverImportance[key] * weight;
+    }
+    scores[key] = Math.round(weightedSum);
+  }
+
+  return scores;
+}
+
+// === Server-side scoring (raw DB data) ===
+
+interface PlayerData {
+  willingnessToPay: number;
+  driverImportance: Record<DriverKey, number>;
+}
+
+export function calculateAverageWillingnessFromPlayers(
+  players: PlayerData[]
+): number {
+  if (players.length === 0) return 0;
+  return Math.round(
+    players.reduce((sum, p) => sum + p.willingnessToPay, 0) / players.length
+  );
+}
+
+export function calculateWeightedDriverScoresFromPlayers(
+  players: PlayerData[]
+): DriverScores {
+  if (players.length === 0) return { ...INITIAL_DRIVER_SCORES };
+
+  const totalWillingness = players.reduce(
+    (sum, p) => sum + p.willingnessToPay,
+    0
+  );
+  if (totalWillingness === 0) return { ...INITIAL_DRIVER_SCORES };
+
+  const keys: DriverKey[] = [
+    "growthDemand",
+    "ageingAssets",
+    "gridResilience",
+    "innovation",
+    "reliability",
+  ];
+
+  const scores: DriverScores = { ...INITIAL_DRIVER_SCORES };
+
+  for (const key of keys) {
+    let weightedSum = 0;
+    for (const player of players) {
       const weight = player.willingnessToPay / totalWillingness;
       weightedSum += player.driverImportance[key] * weight;
     }
