@@ -1,10 +1,10 @@
-# Active Context: Next.js Starter Template
+# Active Context: PowerGrid WSA — Power Grid Management Game
 
 ## Current State
 
-**Template Status**: ✅ Ready for development
+**Project Status**: ✅ Fully playable turn-based multiplayer game
 
-The template is a clean Next.js 16 starter with TypeScript and Tailwind CSS 4. It's ready for AI-assisted expansion to build any type of application.
+A turn-based multiplayer power grid management game set in Western Sydney, where players act as customers deciding investment priorities for a growing electricity network.
 
 ## Recently Completed
 
@@ -14,59 +14,61 @@ The template is a clean Next.js 16 starter with TypeScript and Tailwind CSS 4. I
 - [x] ESLint configuration
 - [x] Memory bank documentation
 - [x] Recipe system for common features
+- [x] Game type system (`src/lib/types.ts`) — drivers, disasters, assets, game state
+- [x] Game engine (`src/lib/game-engine.ts`) — scoring, actions, disasters, quarter progression
+- [x] Game state management (`src/lib/game-context.tsx`) — React context + useReducer
+- [x] Lobby screen with player count selection (2-6 players)
+- [x] Player setup phase — willingness-to-pay slider ($50-$500/qtr), 5 driver importance sliders
+- [x] Slider caps based on willingness to pay (higher payment = higher max slider value)
+- [x] Weighted average scoring (priorities weighted by each customer's payment)
+- [x] Results phase showing individual choices and weighted priority breakdown
+- [x] Turn-based game board with 16 quarters across 4 years
+- [x] Grid management: population growth, demand/capacity tracking, asset health/aging
+- [x] 10 disaster types (heatwaves, storms, bushfire, cyber attacks, etc.)
+- [x] 10+ investment actions with driver-specific effects
+- [x] Game over screen with letter grade, final stats, and driver health vs priority comparison
 
 ## Current Structure
 
 | File/Directory | Purpose | Status |
 |----------------|---------|--------|
-| `src/app/page.tsx` | Home page | ✅ Ready |
-| `src/app/layout.tsx` | Root layout | ✅ Ready |
-| `src/app/globals.css` | Global styles | ✅ Ready |
+| `src/app/page.tsx` | Home — renders GameProvider + GameContainer | ✅ Ready |
+| `src/app/layout.tsx` | Root layout with metadata | ✅ Ready |
+| `src/app/globals.css` | Global styles (Tailwind) | ✅ Ready |
+| `src/lib/types.ts` | All TypeScript types, constants, driver/disaster configs | ✅ Ready |
+| `src/lib/game-engine.ts` | Game logic — scoring, actions, disasters, progression | ✅ Ready |
+| `src/lib/game-context.tsx` | React context + useReducer for game state | ✅ Ready |
+| `src/components/game/Lobby.tsx` | Game lobby — player count, scenario intro | ✅ Ready |
+| `src/components/game/PlayerSetup.tsx` | Per-player setup — pay & priority sliders | ✅ Ready |
+| `src/components/game/Results.tsx` | Weighted scoring results display | ✅ Ready |
+| `src/components/game/GameBoard.tsx` | Main game board — grid status, actions, events | ✅ Ready |
+| `src/components/game/GameOver.tsx` | End screen — grade, stats, comparison | ✅ Ready |
+| `src/components/game/GameContainer.tsx` | Phase router — renders correct screen | ✅ Ready |
 | `.kilocode/` | AI context & recipes | ✅ Ready |
 
-## Current Focus
+## Game Architecture
 
-The template is ready. Next steps depend on user requirements:
+### Phases
+1. **Lobby** → Choose player count (2-6)
+2. **Player Setup** → Each player picks willingness-to-pay and driver importance (pass-the-device)
+3. **Results** → Shows average willingness and weighted priority scores
+4. **Playing** → 16 quarters of turn-based grid management
+5. **Game Over** → Final score, grade, and comparison
 
-1. What type of application to build
-2. What features are needed
-3. Design/branding preferences
+### 5 Drivers
+- Growth Demands (airport, data centres, population)
+- Replacing Ageing Assets (infrastructure end-of-life)
+- Grid Resilience (disaster hardening)
+- Innovation & DER/EV (solar, batteries, EVs)
+- Reliability (uninterrupted supply)
 
-## Quick Start Guide
-
-### To add a new page:
-
-Create a file at `src/app/[route]/page.tsx`:
-```tsx
-export default function NewPage() {
-  return <div>New page content</div>;
-}
-```
-
-### To add components:
-
-Create `src/components/` directory and add components:
-```tsx
-// src/components/ui/Button.tsx
-export function Button({ children }: { children: React.ReactNode }) {
-  return <button className="px-4 py-2 bg-blue-600 text-white rounded">{children}</button>;
-}
-```
-
-### To add a database:
-
-Follow `.kilocode/recipes/add-database.md`
-
-### To add API routes:
-
-Create `src/app/api/[route]/route.ts`:
-```tsx
-import { NextResponse } from "next/server";
-
-export async function GET() {
-  return NextResponse.json({ message: "Hello" });
-}
-```
+### Key Mechanics
+- Willingness to pay caps max slider value (low payers get less influence)
+- Weighted average: `(player_importance × player_payment) / total_payments` per driver
+- Disasters randomly trigger with increasing probability each quarter
+- Assets age each quarter and degrade when nearing end-of-life
+- Population and demand grow with accelerating rate (airport-driven)
+- Milestone events at Q4 (airport opens), Q8 (data centre), Q12 (airport expansion)
 
 ## Available Recipes
 
@@ -76,12 +78,16 @@ export async function GET() {
 
 ## Pending Improvements
 
-- [ ] Add more recipes (auth, email, etc.)
-- [ ] Add example components
-- [ ] Add testing setup recipe
+- [ ] Real-time multiplayer (currently pass-the-device)
+- [ ] Persistent game state (database-backed)
+- [ ] More granular action effects
+- [ ] Visual grid map of Western Sydney
+- [ ] Sound effects and animations
+- [ ] Leaderboard / score history
 
 ## Session History
 
 | Date | Changes |
 |------|---------|
 | Initial | Template created with base setup |
+| 2026-05-28 | Built complete PowerGrid WSA game — lobby, player setup with payment/priority sliders, weighted scoring, turn-based game board with disasters, game over grading |
