@@ -113,9 +113,15 @@ export default function GameBoard() {
 
           <div className="flex items-center gap-4">
             <div className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5">
+              <span className="text-slate-400 text-xs">Revenue/qtr: </span>
+              <span className="font-bold text-blue-400">
+                ${game.grid.quarterlyRevenue.toLocaleString()}
+              </span>
+            </div>
+            <div className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5">
               <span className="text-slate-400 text-xs">Budget: </span>
               <span
-                className={`font-bold ${game.grid.budget < 200 ? "text-red-400" : "text-emerald-400"}`}
+                className={`font-bold ${game.grid.budget < game.grid.quarterlyRevenue * 0.3 ? "text-red-400" : "text-emerald-400"}`}
               >
                 ${game.grid.budget.toLocaleString()}
               </span>

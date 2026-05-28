@@ -27,15 +27,31 @@ export default function Results() {
           </p>
         </div>
 
-        {/* Average Willingness */}
-        <div className="bg-slate-800/80 backdrop-blur border border-slate-700 rounded-2xl p-6 mb-6 text-center">
-          <div className="text-slate-400 text-sm uppercase tracking-wide mb-1">
-            Average Willingness to Pay
+        {/* Revenue Summary */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div className="bg-slate-800/80 backdrop-blur border border-slate-700 rounded-2xl p-6 text-center">
+            <div className="text-slate-400 text-sm uppercase tracking-wide mb-1">
+              Average Willingness to Pay
+            </div>
+            <div className="text-4xl font-bold text-amber-400">
+              ${game.averageWillingnessToPay}
+            </div>
+            <div className="text-slate-500 text-sm mt-1">
+              per customer per quarter
+            </div>
           </div>
-          <div className="text-5xl font-bold text-amber-400">
-            ${game.averageWillingnessToPay}
+          <div className="bg-slate-800/80 backdrop-blur border border-slate-700 rounded-2xl p-6 text-center">
+            <div className="text-slate-400 text-sm uppercase tracking-wide mb-1">
+              Quarterly Grid Revenue
+            </div>
+            <div className="text-4xl font-bold text-emerald-400">
+              ${(game.playerCount * game.averageWillingnessToPay).toLocaleString()}
+            </div>
+            <div className="text-slate-500 text-sm mt-1">
+              {game.playerCount} customers &times; $
+              {game.averageWillingnessToPay}/qtr
+            </div>
           </div>
-          <div className="text-slate-500 text-sm mt-1">per quarter</div>
         </div>
 
         {/* Per-Player Breakdown */}

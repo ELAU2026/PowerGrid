@@ -68,7 +68,7 @@ const initialState: GameState = {
   quarter: 1,
   maxQuarters: 16,
   currentPlayerTurn: 0,
-  grid: createInitialGridState(150),
+  grid: createInitialGridState(150, 3),
   driverHealth: {
     growthDemand: 60,
     ageingAssets: 50,
@@ -140,7 +140,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case "START_GAME": {
-      const grid = createInitialGridState(state.averageWillingnessToPay);
+      const grid = createInitialGridState(
+        state.averageWillingnessToPay,
+        state.playerCount
+      );
       const driverHealth: Record<DriverKey, number> = {
         growthDemand: Math.min(60, state.weightedDriverScores.growthDemand + 30),
         ageingAssets: Math.min(50, state.weightedDriverScores.ageingAssets + 20),

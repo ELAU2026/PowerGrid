@@ -10,7 +10,6 @@ import {
   type GridAsset,
   INITIAL_DRIVER_SCORES,
   DISASTERS,
-  QUARTERLY_BASE_COST,
 } from "./types";
 
 // === Scoring ===
@@ -143,120 +142,151 @@ function createInitialAssets(): GridAsset[] {
   ];
 }
 
-export function createInitialGridState(avgPay: number): GridState {
+export function createInitialGridState(
+  avgPay: number,
+  playerCount: number
+): GridState {
+  // Quarterly revenue = aggregate of all customers' willingness to pay
+  const quarterlyRevenue = playerCount * avgPay;
   return {
     population: 350000,
     demand: 800, // MW
     capacity: 1050, // MW (some headroom)
     reliability: 92,
     customerSatisfaction: 70,
-    budget: avgPay * 4 * 10, // quarterly * 4 quarters * multiplier for game scale
-    quarterlyRevenue: avgPay * 10, // scaled for game
+    budget: quarterlyRevenue * 2, // start with 2 quarters of runway
+    quarterlyRevenue,
     assets: createInitialAssets(),
   };
 }
 
 // === Actions ===
+//
+// Action costs are expressed as fractions of the quarterly revenue so the
+// economy scales naturally with player count and average willingness to pay.
+// With all players taking a turn each quarter, the group can typically afford
+// 2-4 actions total depending on the mix of cheap vs expensive choices.
+
+interface ActionTemplate {
+  id: string;
+  name: string;
+  description: string;
+  /** Cost as a fraction of quarterly revenue (e.g. 0.55 = 55% of one quarter's income) */
+  costFraction: number;
+  driver: DriverKey;
+  effect: Partial<Record<DriverKey, number>>;
+}
+
+const ACTION_TEMPLATES: ActionTemplate[] = [
+  {
+    id: "build-substation",
+    name: "Build New Substation",
+    description: "Construct a new zone substation near the airport precinct",
+    costFraction: 0.55,
+    driver: "growthDemand",
+    effect: { growthDemand: 15, reliability: 5 },
+  },
+  {
+    id: "upgrade-transmission",
+    name: "Upgrade Transmission Lines",
+    description: "Replace ageing transmission conductors with high-capacity lines",
+    costFraction: 0.40,
+    driver: "ageingAssets",
+    effect: { ageingAssets: 20, reliability: 10 },
+  },
+  {
+    id: "storm-hardening",
+    name: "Storm Hardening Program",
+    description: "Underground critical cables and reinforce pole infrastructure",
+    costFraction: 0.35,
+    driver: "gridResilience",
+    effect: { gridResilience: 20, ageingAssets: 5 },
+  },
+  {
+    id: "install-solar",
+    name: "Community Solar Installation",
+    description: "Deploy rooftop solar across new housing developments",
+    costFraction: 0.20,
+    driver: "innovation",
+    effect: { innovation: 15, growthDemand: 5 },
+  },
+  {
+    id: "ev-infrastructure",
+    name: "EV Charging Network",
+    description: "Install smart EV chargers across the Aerotropolis precinct",
+    costFraction: 0.28,
+    driver: "innovation",
+    effect: { innovation: 20, growthDemand: 5 },
+  },
+  {
+    id: "battery-storage",
+    name: "Grid Battery Storage",
+    description: "Deploy large-scale battery to manage peak demand and solar integration",
+    costFraction: 0.48,
+    driver: "gridResilience",
+    effect: { gridResilience: 15, innovation: 10, reliability: 5 },
+  },
+  {
+    id: "maintenance-program",
+    name: "Asset Maintenance Blitz",
+    description: "Accelerated inspection and repair program for ageing equipment",
+    costFraction: 0.22,
+    driver: "ageingAssets",
+    effect: { ageingAssets: 15, reliability: 10 },
+  },
+  {
+    id: "smart-grid",
+    name: "Smart Grid Sensors",
+    description: "Deploy IoT sensors for real-time grid monitoring and automated responses",
+    costFraction: 0.30,
+    driver: "innovation",
+    effect: { innovation: 15, reliability: 10, gridResilience: 5 },
+  },
+  {
+    id: "demand-response",
+    name: "Demand Response Program",
+    description: "Incentivise customers to reduce usage during peak periods",
+    costFraction: 0.15,
+    driver: "reliability",
+    effect: { reliability: 15, innovation: 5 },
+  },
+  {
+    id: "data-centre-connection",
+    name: "Data Centre Direct Feed",
+    description: "Build dedicated high-voltage connection for new data centre campus",
+    costFraction: 0.60,
+    driver: "growthDemand",
+    effect: { growthDemand: 25, reliability: 5 },
+  },
+];
 
 export function generateActions(
   _driverScores: DriverScores,
   quarter: number,
   grid: GridState
 ): QuarterAction[] {
-  const baseActions: QuarterAction[] = [
-    {
-      id: "build-substation",
-      name: "Build New Substation",
-      description: "Construct a new zone substation near the airport precinct",
-      cost: 800,
-      driver: "growthDemand",
-      effect: { growthDemand: 15, reliability: 5 },
-    },
-    {
-      id: "upgrade-transmission",
-      name: "Upgrade Transmission Lines",
-      description: "Replace ageing transmission conductors with high-capacity lines",
-      cost: 600,
-      driver: "ageingAssets",
-      effect: { ageingAssets: 20, reliability: 10 },
-    },
-    {
-      id: "storm-hardening",
-      name: "Storm Hardening Program",
-      description: "Underground critical cables and reinforce pole infrastructure",
-      cost: 500,
-      driver: "gridResilience",
-      effect: { gridResilience: 20, ageingAssets: 5 },
-    },
-    {
-      id: "install-solar",
-      name: "Community Solar Installation",
-      description: "Deploy rooftop solar across new housing developments",
-      cost: 300,
-      driver: "innovation",
-      effect: { innovation: 15, growthDemand: 5 },
-    },
-    {
-      id: "ev-infrastructure",
-      name: "EV Charging Network",
-      description: "Install smart EV chargers across the Aerotropolis precinct",
-      cost: 400,
-      driver: "innovation",
-      effect: { innovation: 20, growthDemand: 5 },
-    },
-    {
-      id: "battery-storage",
-      name: "Grid Battery Storage",
-      description: "Deploy large-scale battery to manage peak demand and solar integration",
-      cost: 700,
-      driver: "gridResilience",
-      effect: { gridResilience: 15, innovation: 10, reliability: 5 },
-    },
-    {
-      id: "maintenance-program",
-      name: "Asset Maintenance Blitz",
-      description: "Accelerated inspection and repair program for ageing equipment",
-      cost: 350,
-      driver: "ageingAssets",
-      effect: { ageingAssets: 15, reliability: 10 },
-    },
-    {
-      id: "smart-grid",
-      name: "Smart Grid Sensors",
-      description: "Deploy IoT sensors for real-time grid monitoring and automated responses",
-      cost: 450,
-      driver: "innovation",
-      effect: { innovation: 15, reliability: 10, gridResilience: 5 },
-    },
-    {
-      id: "demand-response",
-      name: "Demand Response Program",
-      description: "Incentivise customers to reduce usage during peak periods",
-      cost: 200,
-      driver: "reliability",
-      effect: { reliability: 15, innovation: 5 },
-    },
-    {
-      id: "data-centre-connection",
-      name: "Data Centre Direct Feed",
-      description: "Build dedicated high-voltage connection for new data centre campus",
-      cost: 900,
-      driver: "growthDemand",
-      effect: { growthDemand: 25, reliability: 5 },
-    },
-  ];
+  const rev = grid.quarterlyRevenue;
 
-  // Scale costs with quarter progression
+  // Costs inflate slightly each quarter (5% compounding)
   const costMultiplier = 1 + (quarter - 1) * 0.05;
 
-  // Add emergency actions if grid is stressed
+  const baseActions: QuarterAction[] = ACTION_TEMPLATES.map((t) => ({
+    id: t.id,
+    name: t.name,
+    description: t.description,
+    cost: Math.round(t.costFraction * rev * costMultiplier),
+    driver: t.driver,
+    effect: t.effect,
+  }));
+
+  // Emergency actions (premium-priced) only when grid is stressed
   const emergencyActions: QuarterAction[] = [];
   if (grid.reliability < 70) {
     emergencyActions.push({
       id: "emergency-repair",
       name: "Emergency Grid Repair",
       description: "Emergency crews deployed to restore critical infrastructure",
-      cost: Math.round(400 * costMultiplier),
+      cost: Math.round(0.35 * rev * costMultiplier),
       driver: "reliability",
       effect: { reliability: 25, ageingAssets: 5 },
     });
@@ -266,19 +296,13 @@ export function generateActions(
       id: "emergency-capacity",
       name: "Emergency Capacity Boost",
       description: "Deploy temporary generation to prevent blackouts",
-      cost: Math.round(500 * costMultiplier),
+      cost: Math.round(0.40 * rev * costMultiplier),
       driver: "growthDemand",
       effect: { growthDemand: 10, reliability: 15 },
     });
   }
 
-  return [
-    ...baseActions.map((a) => ({
-      ...a,
-      cost: Math.round(a.cost * costMultiplier),
-    })),
-    ...emergencyActions,
-  ];
+  return [...baseActions, ...emergencyActions];
 }
 
 // === Disasters ===
@@ -339,8 +363,9 @@ export function applyDisasterDamage(
     return asset;
   });
 
-  // Budget hit for emergency response
-  newGrid.budget = Math.max(0, newGrid.budget - Math.round(200 * mult));
+  // Budget hit for emergency response — scaled to ~15% of quarterly revenue per severity unit
+  const emergencyCost = Math.round(grid.quarterlyRevenue * 0.15 * mult);
+  newGrid.budget = Math.max(0, newGrid.budget - emergencyCost);
 
   return { grid: newGrid, driverHealth: newHealth };
 }
@@ -373,11 +398,16 @@ export function progressQuarter(
     });
   }
 
-  // Revenue
+  // Revenue — customers pay in each quarter
   newGrid.budget += newGrid.quarterlyRevenue;
 
-  // Operating costs
-  newGrid.budget -= QUARTERLY_BASE_COST + quarter * 20;
+  // Operating costs — base ~40% of revenue, rising ~1.5% of revenue per quarter
+  // This leaves ~60% of each quarter's revenue for discretionary investment early on,
+  // narrowing to ~36% by Q16, reflecting rising costs of maintaining a growing grid.
+  const opex = Math.round(
+    newGrid.quarterlyRevenue * (0.40 + quarter * 0.015)
+  );
+  newGrid.budget -= opex;
 
   // Asset aging
   newGrid.assets = newGrid.assets.map((asset) => {
