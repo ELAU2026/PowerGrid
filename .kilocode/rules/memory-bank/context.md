@@ -1,93 +1,105 @@
-# Active Context: PowerGrid WSA — Power Grid Management Game
+# Active Context: PowerGrid WSA — Synchronous Multiplayer Power Grid Game
 
 ## Current State
 
-**Project Status**: ✅ Fully playable turn-based multiplayer game
+**Project Status**: ✅ Fully functional synchronous multiplayer game with behavioural economics analytics
 
-A turn-based multiplayer power grid management game set in Western Sydney, where players act as customers deciding investment priorities for a growing electricity network.
+A turn-based multiplayer power grid management game set in Western Sydney. Players join from their own devices/browsers via a 6-character game code. An admin controls the game flow. The game tests what customers truly value through behavioural economics — comparing stated preferences with revealed spending behaviour.
 
 ## Recently Completed
 
-- [x] Base Next.js 16 setup with App Router
-- [x] TypeScript configuration with strict mode
-- [x] Tailwind CSS 4 integration
-- [x] ESLint configuration
-- [x] Memory bank documentation
-- [x] Recipe system for common features
-- [x] Game type system (`src/lib/types.ts`) — drivers, disasters, assets, game state
-- [x] Game engine (`src/lib/game-engine.ts`) — scoring, actions, disasters, quarter progression
-- [x] Game state management (`src/lib/game-context.tsx`) — React context + useReducer
-- [x] Lobby screen with player count selection (2-6 players)
-- [x] Player setup phase — willingness-to-pay slider ($50-$500/qtr), 5 driver importance sliders
-- [x] Slider caps based on willingness to pay (higher payment = higher max slider value)
-- [x] Weighted average scoring (priorities weighted by each customer's payment)
-- [x] Results phase showing individual choices and weighted priority breakdown
-- [x] Turn-based game board with 16 quarters across 4 years
-- [x] Grid management: population growth, demand/capacity tracking, asset health/aging
-- [x] 10 disaster types (heatwaves, storms, bushfire, cyber attacks, etc.)
-- [x] 10+ investment actions with driver-specific effects
-- [x] Game over screen with letter grade, final stats, and driver health vs priority comparison
+- [x] SQLite database with Drizzle ORM (games, players, action_log tables)
+- [x] Server-side game state management via API routes
+- [x] 2-second polling for real-time synchronisation across all devices
+- [x] Admin dashboard: create game, configure duration (4-32 qtrs), max players (2-20)
+- [x] Admin game controls: start preferences, calculate results, start game, advance quarters, end game
+- [x] Player join flow: game code entry on own device
+- [x] Player preferences phase: WTP slider + 5 driver importance sliders (capped by WTP)
+- [x] Synchronous play: all players choose actions simultaneously, admin advances quarter
+- [x] Budget = playerCount * avgWTP; action costs as % of quarterly revenue
+- [x] 10 disaster types, 10+ investment actions, quarter progression with growth events
+- [x] Behavioural economics analytics engine:
+  - Stated vs Revealed preferences (cosine similarity comparison)
+  - Customer segmentation (6 segments based on behaviour patterns)
+  - Action-outcome correlations and popularity tracking
+  - WTP vs action count correlation (Pearson)
+  - Budget efficiency scoring
+  - Per-player dual-bar stated/revealed visualization
 
-## Current Structure
+## Architecture
 
-| File/Directory | Purpose | Status |
-|----------------|---------|--------|
-| `src/app/page.tsx` | Home — renders GameProvider + GameContainer | ✅ Ready |
-| `src/app/layout.tsx` | Root layout with metadata | ✅ Ready |
-| `src/app/globals.css` | Global styles (Tailwind) | ✅ Ready |
-| `src/lib/types.ts` | All TypeScript types, constants, driver/disaster configs | ✅ Ready |
-| `src/lib/game-engine.ts` | Game logic — scoring, actions, disasters, progression | ✅ Ready |
-| `src/lib/game-context.tsx` | React context + useReducer for game state | ✅ Ready |
-| `src/components/game/Lobby.tsx` | Game lobby — player count, scenario intro | ✅ Ready |
-| `src/components/game/PlayerSetup.tsx` | Per-player setup — pay & priority sliders | ✅ Ready |
-| `src/components/game/Results.tsx` | Weighted scoring results display | ✅ Ready |
-| `src/components/game/GameBoard.tsx` | Main game board — grid status, actions, events | ✅ Ready |
-| `src/components/game/GameOver.tsx` | End screen — grade, stats, comparison | ✅ Ready |
-| `src/components/game/GameContainer.tsx` | Phase router — renders correct screen | ✅ Ready |
-| `.kilocode/` | AI context & recipes | ✅ Ready |
+### Routes
+| Route | Purpose |
+|-------|---------|
+| `/` | Landing page — join game or create game (admin) |
+| `/admin?gameId=XXX` | Admin dashboard — full game control + analytics |
+| `/play?gameId=XXX` | Player view — preferences, actions, results |
 
-## Game Architecture
+### API Routes
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/game` | POST | Create new game |
+| `/api/game/join` | POST | Player joins game |
+| `/api/game/state` | GET | Poll game state (player or admin) |
+| `/api/game/preferences` | POST | Submit player preferences |
+| `/api/game/action` | POST | Submit player action for quarter |
+| `/api/game/admin` | POST | Admin control actions |
 
-### Phases
-1. **Lobby** → Choose player count (2-6)
-2. **Player Setup** → Each player picks willingness-to-pay and driver importance (pass-the-device)
-3. **Results** → Shows average willingness and weighted priority scores
-4. **Playing** → 16 quarters of turn-based grid management
-5. **Game Over** → Final score, grade, and comparison
+### Database Tables
+| Table | Purpose |
+|-------|---------|
+| `games` | Game state, config, serialised grid/events |
+| `players` | Player preferences, session tokens, action status |
+| `action_log` | Every action taken (for analytics) |
 
-### 5 Drivers
-- Growth Demands (airport, data centres, population)
-- Replacing Ageing Assets (infrastructure end-of-life)
-- Grid Resilience (disaster hardening)
-- Innovation & DER/EV (solar, batteries, EVs)
-- Reliability (uninterrupted supply)
+### Game Phases
+1. **Lobby** → Admin creates game, players join via code
+2. **Preferences** → Each player submits WTP + driver importance on own device
+3. **Results** → Shows weighted priorities + aggregate revenue
+4. **Playing** → Simultaneous action selection each quarter, admin advances
+5. **Game Over** → Full behavioural analytics + segmentation
 
-### Key Mechanics
-- Willingness to pay caps max slider value (low payers get less influence)
-- Weighted average: `(player_importance × player_payment) / total_payments` per driver
-- Disasters randomly trigger with increasing probability each quarter
-- Assets age each quarter and degrade when nearing end-of-life
-- Population and demand grow with accelerating rate (airport-driven)
-- Milestone events at Q4 (airport opens), Q8 (data centre), Q12 (airport expansion)
+### Customer Segments (Auto-classified)
+- **Reliability Seeker** — prioritises uninterrupted supply
+- **Growth Champion** — focused on meeting new demand
+- **Innovation Advocate** — invests in DER, EVs, smart grid
+- **Resilience Builder** — hardens grid against disasters
+- **Budget Conscious** — low WTP, seeks value
+- **Balanced Strategist** — spreads investment evenly
 
-## Available Recipes
+### Auth Model
+- Admin: `adminToken` stored in localStorage, passed to API
+- Players: `sessionToken` stored in localStorage, passed to API
+- No user accounts — session-based for game duration
 
-| Recipe | File | Use Case |
-|--------|------|----------|
-| Add Database | `.kilocode/recipes/add-database.md` | Data persistence with Drizzle + SQLite |
+## Current File Structure
 
-## Pending Improvements
+| File | Purpose |
+|------|---------|
+| `src/app/page.tsx` | Landing — join/create game |
+| `src/app/admin/page.tsx` | Admin dashboard |
+| `src/app/play/page.tsx` | Player view (all phases) |
+| `src/app/api/game/*.ts` | 6 API route files |
+| `src/lib/types.ts` | Game types, drivers, disasters |
+| `src/lib/game-engine.ts` | Game logic (scoring, actions, progression) |
+| `src/lib/analytics.ts` | Behavioural economics analytics engine |
+| `src/db/schema.ts` | Drizzle schema (3 tables) |
+| `src/db/index.ts` | Database client |
+| `src/db/migrate.ts` | Migration runner |
+| `drizzle.config.ts` | Drizzle config |
 
-- [ ] Real-time multiplayer (currently pass-the-device)
-- [ ] Persistent game state (database-backed)
-- [ ] More granular action effects
-- [ ] Visual grid map of Western Sydney
-- [ ] Sound effects and animations
-- [ ] Leaderboard / score history
+## Tech Stack
+
+- Next.js 16 (App Router), React 19, TypeScript 5.9
+- Tailwind CSS 4, Drizzle ORM, SQLite
+- Bun package manager
+- No WebSocket — uses 2-second polling for simplicity
 
 ## Session History
 
 | Date | Changes |
 |------|---------|
 | Initial | Template created with base setup |
-| 2026-05-28 | Built complete PowerGrid WSA game — lobby, player setup with payment/priority sliders, weighted scoring, turn-based game board with disasters, game over grading |
+| 2026-05-28 | Built single-player PowerGrid WSA game |
+| 2026-05-28 | Fixed budget model: revenue = playerCount * avgPay |
+| 2026-05-28 | Converted to synchronous multiplayer with server-side state, admin dashboard, player devices, behavioural economics analytics, customer segmentation |
