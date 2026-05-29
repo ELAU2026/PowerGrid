@@ -238,8 +238,8 @@ const ACTION_TEMPLATES: ActionTemplate[] = [
   },
   {
     id: "upgrade-transmission",
-    name: "Upgrade Transmission Lines",
-    description: "Replace ageing transmission conductors with high-capacity lines",
+    name: "Upgrade Lines",
+    description: "Replace ageing conductors with high-capacity lines across the network",
     costFraction: 0.40,
     driver: "ageingAssets",
     effect: { ageingAssets: 20, reliability: 10 },
@@ -253,12 +253,28 @@ const ACTION_TEMPLATES: ActionTemplate[] = [
     effect: { gridResilience: 20, ageingAssets: 5 },
   },
   {
-    id: "install-solar",
-    name: "Community Solar Installation",
-    description: "Deploy rooftop solar across new housing developments",
-    costFraction: 0.20,
+    id: "flexible-export",
+    name: "Flexible Export",
+    description: "Enable customers to export more power to the grid from their solar and batteries for most of the year",
+    costFraction: 0.25,
     driver: "innovation",
-    effect: { innovation: 15, growthDemand: 5 },
+    effect: { innovation: 15, gridResilience: 5, reliability: 5 },
+  },
+  {
+    id: "cybersecurity-upgrade",
+    name: "Cybersecurity Equipment Upgrade",
+    description: "Upgrade existing grid control and monitoring equipment to lower cybersecurity risk",
+    costFraction: 0.30,
+    driver: "reliability",
+    effect: { reliability: 15, innovation: 10 },
+  },
+  {
+    id: "cables-switchgear-upgrade",
+    name: "Upgrade Cables & Switchgear",
+    description: "Replace degraded cables and switchgear to improve reliability and public safety",
+    costFraction: 0.35,
+    driver: "ageingAssets",
+    effect: { ageingAssets: 20, reliability: 10, gridResilience: 5 },
   },
   {
     id: "ev-infrastructure",
@@ -625,17 +641,23 @@ export function applyAction(
       maxAge: 50,
     });
   }
-  if (action.id === "install-solar") {
-    newGrid.capacity += 30;
-    newGrid.assets.push({
-      id: `solar-${Date.now()}`,
-      name: "New Solar Installation",
-      type: "solar",
-      health: 100,
-      capacity: 30,
-      age: 0,
-      maxAge: 25,
-    });
+  if (action.id === "flexible-export") {
+    // Flexible export enables more customer DER export, slightly increasing effective capacity
+    newGrid.capacity += 15;
+    newGrid.reliability = Math.min(100, newGrid.reliability + 3);
+  }
+  if (action.id === "cybersecurity-upgrade") {
+    // Cybersecurity upgrade improves grid monitoring resilience
+    newGrid.reliability = Math.min(100, newGrid.reliability + 8);
+  }
+  if (action.id === "cables-switchgear-upgrade") {
+    // Upgrade degraded cables and switchgear — restore health of distribution/transmission assets
+    newGrid.assets = newGrid.assets.map((a) =>
+      (a.type === "distribution" || a.type === "transmission") && a.health < 80
+        ? { ...a, health: Math.min(100, a.health + 20) }
+        : a
+    );
+    newGrid.reliability = Math.min(100, newGrid.reliability + 5);
   }
   if (action.id === "battery-storage") {
     newGrid.capacity += 20;

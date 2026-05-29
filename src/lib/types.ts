@@ -182,7 +182,7 @@ export const SCENARIOS: Scenario[] = [
     decisionPrompt:
       "Ageing infrastructure is a ticking time bomb. Many assets are past their design life. What's the priority?",
     damageType: ["ageingAssets", "reliability"],
-    relevantActionIds: ["upgrade-transmission", "maintenance-program", "build-substation", "emergency-repair"],
+    relevantActionIds: ["upgrade-transmission", "maintenance-program", "build-substation", "emergency-repair", "cables-switchgear-upgrade"],
     category: "infrastructure",
   },
   {
@@ -197,7 +197,7 @@ export const SCENARIOS: Scenario[] = [
     decisionPrompt:
       "Hidden infrastructure is failing without warning. How should the network manage aging assets?",
     damageType: ["ageingAssets", "reliability"],
-    relevantActionIds: ["maintenance-program", "upgrade-transmission", "smart-grid"],
+    relevantActionIds: ["maintenance-program", "upgrade-transmission", "smart-grid", "cables-switchgear-upgrade"],
     category: "infrastructure",
   },
   {
@@ -243,7 +243,7 @@ export const SCENARIOS: Scenario[] = [
     decisionPrompt:
       "Residential growth is outpacing network capacity. What's the best way to keep up?",
     damageType: ["growthDemand", "innovation"],
-    relevantActionIds: ["build-substation", "install-solar", "battery-storage", "ev-infrastructure"],
+    relevantActionIds: ["build-substation", "flexible-export", "battery-storage", "ev-infrastructure"],
     category: "demand",
   },
   {
@@ -259,7 +259,7 @@ export const SCENARIOS: Scenario[] = [
     decisionPrompt:
       "Cyber threats to critical infrastructure are escalating. Where should the network invest?",
     damageType: ["reliability", "innovation"],
-    relevantActionIds: ["smart-grid", "demand-response", "battery-storage"],
+    relevantActionIds: ["smart-grid", "demand-response", "battery-storage", "cybersecurity-upgrade"],
     category: "cyber",
   },
   {
@@ -275,7 +275,7 @@ export const SCENARIOS: Scenario[] = [
     decisionPrompt:
       "DER integration is creating new grid challenges. How should the network adapt?",
     damageType: ["innovation", "gridResilience"],
-    relevantActionIds: ["battery-storage", "smart-grid", "install-solar", "ev-infrastructure"],
+    relevantActionIds: ["battery-storage", "smart-grid", "flexible-export", "ev-infrastructure"],
     category: "innovation",
   },
   {
@@ -306,7 +306,7 @@ export const SCENARIOS: Scenario[] = [
     decisionPrompt:
       "Ageing poles and wires are an everyday risk. Is the network maintaining its assets well enough?",
     damageType: ["ageingAssets"],
-    relevantActionIds: ["maintenance-program", "upgrade-transmission", "storm-hardening"],
+    relevantActionIds: ["maintenance-program", "upgrade-transmission", "storm-hardening", "cables-switchgear-upgrade"],
     category: "infrastructure",
   },
   {
@@ -321,7 +321,7 @@ export const SCENARIOS: Scenario[] = [
     decisionPrompt:
       "Poor power quality affects everyday life. How important is reliable, clean power to you?",
     damageType: ["reliability", "ageingAssets"],
-    relevantActionIds: ["demand-response", "maintenance-program", "smart-grid", "build-substation"],
+    relevantActionIds: ["demand-response", "maintenance-program", "smart-grid", "build-substation", "cables-switchgear-upgrade"],
     category: "infrastructure",
   },
 ];

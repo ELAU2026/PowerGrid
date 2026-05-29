@@ -21,7 +21,7 @@ A turn-based multiplayer power grid management game set in Western Sydney. Playe
 - [x] Every quarter presents a scenario with headline, personal impact story, and decision prompt
 - [x] Scenarios escalate in severity as the game progresses, never repeat until all used
 - [x] Scenario responsiveness tracking: which scenario was active when each action was logged
-- [x] 10+ investment actions, quarter progression with growth events
+- [x] 12 investment actions, quarter progression with growth events
 - [x] Behavioural economics analytics engine:
   - Stated vs Revealed preferences (cosine similarity comparison)
   - Customer segmentation (6 segments based on behaviour patterns)
@@ -110,3 +110,4 @@ A turn-based multiplayer power grid management game set in Western Sydney. Playe
 | 2026-05-28 | Fixed budget model: revenue = playerCount * avgPay |
 | 2026-05-28 | Converted to synchronous multiplayer with server-side state, admin dashboard, player devices, behavioural economics analytics, customer segmentation |
 | 2026-05-28 | Added 14 scenario-driven turns with customer-impact narratives, responsiveness tracking, and per-scenario/per-player responsiveness analytics |
+| 2026-05-29 | Revised base actions: renamed "Upgrade Transmission Lines" → "Upgrade Lines", removed "Community Solar Installation", added "Flexible Export", "Cybersecurity Equipment Upgrade", and "Upgrade Cables & Switchgear" actions with corresponding scenario relevance and applyAction effects |
