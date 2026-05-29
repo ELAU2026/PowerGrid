@@ -75,8 +75,8 @@ export default function Home() {
         <div className="text-center mb-10">
           <div className="text-6xl mb-4">⚡</div>
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-3">
-            PowerGrid
-            <span className="text-amber-400"> WSA</span>
+            Power
+            <span className="text-amber-400"> Grid</span>
           </h1>
           <p className="text-slate-400 text-base max-w-md mx-auto">
             A multiplayer resource management game exploring what customers
