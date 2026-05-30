@@ -22,6 +22,11 @@ interface GameStateResponse {
       customerSatisfaction: number;
       budget: number;
       quarterlyRevenue: number;
+      saidi: number;
+      saifi: number;
+      customerEnergyExport: number;
+      disasterResilience: number;
+      catastrophicFailures: number;
     } | null;
     driverHealth: Record<DriverKey, number> | null;
     events: Array<{
@@ -50,6 +55,7 @@ interface GameStateResponse {
     driverImportance: Record<DriverKey, number> | null;
     preferencesSubmitted: boolean;
     actionSubmittedForQuarter: number;
+    finalSatisfaction: number | null;
   }>;
   isAdmin: boolean;
   analytics: GameAnalytics | null;
@@ -329,22 +335,33 @@ function AdminContent() {
                     value={g.gridState.population.toLocaleString()}
                     icon="👥"
                   />
+                  {/* Reliability removed */}
                   <StatCard
-                    label="Demand"
-                    value={`${g.gridState.demand} MW`}
-                    icon="📈"
-                    warning={g.gridState.demand > g.gridState.capacity * 0.9}
+                    label="SAIDI"
+                    value={`${Math.round(g.gridState.saidi)} min`}
+                    icon="⏱️"
                   />
                   <StatCard
-                    label="Capacity"
-                    value={`${g.gridState.capacity} MW`}
-                    icon="🔋"
+                    label="SAIFI"
+                    value={`${g.gridState.saifi.toFixed(2)}`}
+                    icon="📊"
                   />
                   <StatCard
-                    label="Reliability"
-                    value={`${g.gridState.reliability}%`}
-                    icon="💡"
-                    warning={g.gridState.reliability < 70}
+                    label="Export >2kW"
+                    value={`${g.gridState.customerEnergyExport}% time`}
+                    icon="☀️"
+                  />
+                  <StatCard
+                    label="Resilience"
+                    value={`${g.gridState.disasterResilience}%`}
+                    icon="🛡️"
+                    warning={g.gridState.disasterResilience < 50}
+                  />
+                  <StatCard
+                    label="Catastrophies"
+                    value={`${g.gridState.catastrophicFailures}`}
+                    icon="💥"
+                    warning={g.gridState.catastrophicFailures > 0}
                   />
                 </div>
               </div>
@@ -506,13 +523,34 @@ function AdminContent() {
               </div>
             </div>
 
-            {/* Score */}
+            {/* Score / Satisfaction */}
             {g.phase === "game-over" && (
               <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-6 text-center">
-                <div className="text-4xl font-black text-amber-400 mb-1">
-                  {g.score}
-                </div>
-                <div className="text-slate-400 text-sm">Final Score</div>
+                {(() => {
+                  const submittedScores = data.players
+                    .filter((p) => p.finalSatisfaction !== null)
+                    .map((p) => p.finalSatisfaction as number);
+                  const avg =
+                    submittedScores.length > 0
+                      ? (
+                          submittedScores.reduce((a, b) => a + b, 0) /
+                          submittedScores.length
+                        ).toFixed(1)
+                      : "0.0";
+                  return (
+                    <>
+                      <div className="text-slate-400 text-sm mb-1 uppercase tracking-wider font-semibold">
+                        Average Customer Satisfaction
+                      </div>
+                      <div className="text-4xl font-black text-amber-400 mb-2">
+                        {avg} <span className="text-xl text-slate-500">/ 10</span>
+                      </div>
+                      <div className="text-slate-500 text-xs">
+                        Based on {submittedScores.length} response{submittedScores.length !== 1 ? 's' : ''}
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             )}
           </div>

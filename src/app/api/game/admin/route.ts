@@ -148,11 +148,11 @@ export async function POST(req: Request) {
         // Select the first scenario to present to players
         const scenario = selectScenario(1, g.maxQuarters, []);
 
-        // Apply scenario damage to the grid immediately
-        const disaster = scenarioToDisaster(scenario);
-        const { grid: damagedGrid, driverHealth: damagedHealth } =
-          applyDisasterDamage(grid, driverHealth, disaster);
-
+        // Apply scenario damage to the grid immediately (if scenario exists)
+        let damagedGrid = grid;
+        let damagedHealth = driverHealth;
+        let disaster = null;
+        
         const events = [
           {
             quarter: 0,
@@ -161,13 +161,20 @@ export async function POST(req: Request) {
             type: "achievement",
             icon: "🏙️",
           },
-          {
+        ];
+
+        if (scenario) {
+          disaster = scenarioToDisaster(scenario);
+          const res = applyDisasterDamage(grid, driverHealth, disaster);
+          damagedGrid = res.grid;
+          damagedHealth = res.driverHealth;
+          events.push({
             quarter: 1,
             description: `SCENARIO: ${scenario.name} — ${scenario.headline} [scenario:${scenario.id}]`,
             type: "disaster",
             icon: scenario.icon,
-          },
-        ];
+          });
+        }
 
         await db
           .update(games)
@@ -178,8 +185,8 @@ export async function POST(req: Request) {
             driverHealth: JSON.stringify(damagedHealth),
             availableActions: JSON.stringify(actions),
             events: JSON.stringify(events),
-            activeDisaster: JSON.stringify(disaster),
-            activeScenario: JSON.stringify(scenario),
+            activeDisaster: disaster ? JSON.stringify(disaster) : null,
+            activeScenario: scenario ? JSON.stringify(scenario) : null,
             score: 0,
           })
           .where(eq(games.id, code));
@@ -227,27 +234,31 @@ export async function POST(req: Request) {
         // Select a new scenario for this quarter
         const existingEvents = g.events ? JSON.parse(g.events) : [];
         const usedIds = getUsedScenarioIds(existingEvents);
-        const scenario: Scenario = selectScenario(
+        const scenario: Scenario | null = selectScenario(
           nextQuarter,
           g.maxQuarters,
           usedIds
         );
 
         // Apply scenario damage
-        const disaster = scenarioToDisaster(scenario);
-        const { grid: damagedGrid, driverHealth: damagedHealth } =
-          applyDisasterDamage(progressedGrid, progressedHealth, disaster);
+        let damagedGrid = progressedGrid;
+        let damagedHealth = progressedHealth;
+        let disaster = null;
+        const allEvents = [...existingEvents, ...quarterEvents];
 
-        const allEvents = [
-          ...existingEvents,
-          ...quarterEvents,
-          {
+        if (scenario) {
+          disaster = scenarioToDisaster(scenario);
+          const res = applyDisasterDamage(progressedGrid, progressedHealth, disaster);
+          damagedGrid = res.grid;
+          damagedHealth = res.driverHealth;
+          
+          allEvents.push({
             quarter: nextQuarter,
             description: `SCENARIO: ${scenario.name} — ${scenario.headline} [scenario:${scenario.id}]`,
             type: "disaster",
             icon: scenario.icon,
-          },
-        ];
+          });
+        }
 
         const newActions = generateActions(wScores, nextQuarter, damagedGrid);
 
@@ -271,8 +282,8 @@ export async function POST(req: Request) {
             gridState: JSON.stringify(damagedGrid),
             driverHealth: JSON.stringify(damagedHealth),
             events: JSON.stringify(allEvents),
-            activeDisaster: JSON.stringify(disaster),
-            activeScenario: JSON.stringify(scenario),
+            activeDisaster: disaster ? JSON.stringify(disaster) : null,
+            activeScenario: scenario ? JSON.stringify(scenario) : null,
             availableActions: JSON.stringify(newActions),
           })
           .where(eq(games.id, code));
@@ -280,7 +291,7 @@ export async function POST(req: Request) {
         return NextResponse.json({
           ok: true,
           quarter: nextQuarter,
-          scenario: scenario.name,
+          scenario: scenario ? scenario.name : "None",
         });
       }
 

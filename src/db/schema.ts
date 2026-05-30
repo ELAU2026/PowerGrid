@@ -39,6 +39,7 @@ export const players = sqliteTable("players", {
     .default(false),
   // Per-quarter action tracking
   actionSubmittedForQuarter: integer("action_submitted_for_quarter").default(0),
+  finalSatisfaction: integer("final_satisfaction"),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(
     () => new Date()
   ),

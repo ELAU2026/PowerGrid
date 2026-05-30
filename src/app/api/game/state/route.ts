@@ -55,6 +55,7 @@ export async function GET(req: Request) {
         : null,
       preferencesSubmitted: p.preferencesSubmitted,
       actionSubmittedForQuarter: p.actionSubmittedForQuarter,
+      finalSatisfaction: p.finalSatisfaction,
     }));
 
     // Build analytics for game-over or admin view

@@ -127,7 +127,7 @@ export const SCENARIOS: Scenario[] = [
     name: "Bushfire Disrupts Power Supply",
     icon: "🔥",
     severity: "catastrophic",
-    headline: "A fast-moving bushfire in the Blue Mountains has forced emergency power shutdowns.",
+    headline: "A fast-moving bushfire in the Blue Mountains has affected transmission lines, causing a widespread blackout.",
     customerImpact:
       "Your area experienced a preventive blackout lasting 14 hours as fire threatened " +
       "transmission lines. You had no warning — your EV couldn't charge, your solar panels " +
@@ -361,6 +361,11 @@ export interface GridState {
   budget: number; // $ remaining
   quarterlyRevenue: number;
   assets: GridAsset[];
+  saidi: number; // System Average Interruption Duration Index (minutes)
+  saifi: number; // System Average Interruption Frequency Index (interruptions per customer)
+  customerEnergyExport: number; // % of time customer can export more than 2kW
+  disasterResilience: number; // % likelihood of no impact from major events
+  catastrophicFailures: number; // Count of catastrophic failures
 }
 
 export interface DriverScores {

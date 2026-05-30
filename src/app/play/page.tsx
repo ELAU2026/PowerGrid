@@ -3,7 +3,6 @@
 import { useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { DRIVERS, type DriverKey, type QuarterAction } from "@/lib/types";
-import { getMaxSliderValue } from "@/lib/game-engine";
 import type { GameAnalytics } from "@/lib/analytics";
 
 interface GameData {
@@ -22,6 +21,11 @@ interface GameData {
       customerSatisfaction: number;
       budget: number;
       quarterlyRevenue: number;
+      saidi: number;
+      saifi: number;
+      customerEnergyExport: number;
+      disasterResilience: number;
+      catastrophicFailures: number;
     } | null;
     driverHealth: Record<DriverKey, number> | null;
     events: Array<{
@@ -58,6 +62,7 @@ interface GameData {
     driverImportance: Record<DriverKey, number> | null;
     preferencesSubmitted: boolean;
     actionSubmittedForQuarter: number;
+    finalSatisfaction: number | null;
   }>;
   currentPlayerId: number;
   myPreferencesSubmitted: boolean;
@@ -83,15 +88,17 @@ function PlayerContent() {
   // Preferences form state
   const [wtp, setWtp] = useState(150);
   const [importance, setImportance] = useState<Record<DriverKey, number>>({
-    growthDemand: 50,
-    ageingAssets: 50,
-    gridResilience: 50,
-    innovation: 50,
-    reliability: 50,
+    growthDemand: 30,
+    ageingAssets: 30,
+    gridResilience: 30,
+    innovation: 30,
+    reliability: 30,
   });
   const [playerName, setPlayerName] = useState("");
   const [submittingPrefs, setSubmittingPrefs] = useState(false);
   const [submittingAction, setSubmittingAction] = useState(false);
+  const [satisfaction, setSatisfaction] = useState(5);
+  const [submittingSatisfaction, setSubmittingSatisfaction] = useState(false);
 
   useEffect(() => {
     if (gameId) {
@@ -178,6 +185,29 @@ function PlayerContent() {
     }
   };
 
+  const submitSatisfaction = async () => {
+    if (submittingSatisfaction) return;
+    setSubmittingSatisfaction(true);
+    try {
+      const res = await fetch("/api/game/satisfaction", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gameId, sessionToken, score: satisfaction }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        setError(err.error);
+      } else {
+        setError("");
+        fetchState();
+      }
+    } catch {
+      setError("Network error");
+    } finally {
+      setSubmittingSatisfaction(false);
+    }
+  };
+
   if (loading || !data) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
@@ -187,16 +217,45 @@ function PlayerContent() {
   }
 
   const g = data.game;
-  const maxSlider = getMaxSliderValue(wtp);
+  const totalAllocated = Object.values(importance).reduce((a, b) => a + b, 0);
+  const remainingBudget = wtp - totalAllocated;
 
   const handleWtpChange = (val: number) => {
     setWtp(val);
-    const newMax = getMaxSliderValue(val);
     const updated = { ...importance };
-    for (const k of Object.keys(updated) as DriverKey[]) {
-      if (updated[k] > newMax) updated[k] = newMax;
+    if (totalAllocated > 0) {
+      let newTotal = 0;
+      const keys = Object.keys(updated) as DriverKey[];
+      for (let i = 0; i < keys.length; i++) {
+        const k = keys[i];
+        if (i === keys.length - 1) {
+          updated[k] = val - newTotal;
+          // Safety clamp
+          if (updated[k] < 0) updated[k] = 0;
+        } else {
+          updated[k] = Math.round((updated[k] / totalAllocated) * val);
+          newTotal += updated[k];
+        }
+      }
+    } else {
+      const keys = Object.keys(updated) as DriverKey[];
+      const even = Math.floor(val / keys.length);
+      keys.forEach((k) => (updated[k] = even));
+      updated[keys[keys.length - 1]] += val - even * keys.length;
     }
     setImportance(updated);
+  };
+
+  const handleImportanceChange = (key: DriverKey, newVal: number) => {
+    const currentVal = importance[key];
+    let actualVal = newVal;
+    const maxAllowed = currentVal + remainingBudget;
+    
+    if (actualVal > maxAllowed) {
+      actualVal = maxAllowed;
+    }
+    
+    setImportance({ ...importance, [key]: actualVal });
   };
 
   // ===== LOBBY =====
@@ -325,16 +384,21 @@ function PlayerContent() {
               />
               <div className="flex justify-between text-slate-500 text-xs mt-1">
                 <span>$50</span>
-                <span>Max slider: {maxSlider}</span>
+                <span>Max Budget: ${wtp}</span>
                 <span>$500</span>
               </div>
             </div>
 
             {/* Drivers */}
             <div className="mb-6">
-              <h3 className="text-white font-semibold mb-4">
-                Investment Priorities
-              </h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-white font-semibold">
+                  Investment Priorities
+                </h3>
+                <span className={`text-sm font-bold ${remainingBudget === 0 ? "text-emerald-400" : "text-amber-400"}`}>
+                  Unallocated: ${remainingBudget}
+                </span>
+              </div>
               <div className="space-y-5">
                 {DRIVERS.map((d) => (
                   <div key={d.key}>
@@ -346,7 +410,7 @@ function PlayerContent() {
                         </span>
                       </div>
                       <span className="text-amber-400 font-bold tabular-nums">
-                        {importance[d.key]}
+                        ${importance[d.key]}
                       </span>
                     </div>
                     <p className="text-slate-500 text-xs mb-1 ml-7">
@@ -356,14 +420,9 @@ function PlayerContent() {
                       <input
                         type="range"
                         min={0}
-                        max={maxSlider}
+                        max={wtp}
                         value={importance[d.key]}
-                        onChange={(e) =>
-                          setImportance({
-                            ...importance,
-                            [d.key]: parseInt(e.target.value),
-                          })
-                        }
+                        onChange={(e) => handleImportanceChange(d.key, parseInt(e.target.value))}
                         className="w-full h-2 bg-slate-700 rounded-full appearance-none cursor-pointer accent-amber-500 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-amber-400"
                       />
                     </div>
@@ -374,10 +433,10 @@ function PlayerContent() {
 
             <button
               onClick={submitPreferences}
-              disabled={submittingPrefs}
-              className="w-full py-3 bg-amber-500 hover:bg-amber-400 disabled:bg-amber-500/50 text-slate-900 font-bold rounded-xl transition-all"
+              disabled={submittingPrefs || remainingBudget !== 0}
+              className="w-full py-3 bg-amber-500 hover:bg-amber-400 disabled:bg-amber-500/50 disabled:text-slate-900/50 text-slate-900 font-bold rounded-xl transition-all"
             >
-              {submittingPrefs ? "Submitting..." : "Submit Preferences"}
+              {submittingPrefs ? "Submitting..." : (remainingBudget !== 0 ? "Allocate all budget to continue" : "Submit Preferences")}
             </button>
           </div>
 
@@ -559,67 +618,38 @@ function PlayerContent() {
 
           {/* Grid Status Mini */}
           {g.gridState && (
-            <div className="grid grid-cols-4 gap-2 mb-4">
-              <MiniStat
-                label="Demand"
-                value={`${g.gridState.demand} MW`}
-                warn={g.gridState.demand > g.gridState.capacity * 0.9}
-              />
-              <MiniStat
-                label="Capacity"
-                value={`${g.gridState.capacity} MW`}
-              />
-              <MiniStat
-                label="Margin"
-                value={`${capacityMargin.toFixed(0)}%`}
-                warn={capacityMargin < 10}
-              />
+            <div className="grid grid-cols-3 gap-2 mb-4">
               <MiniStat
                 label="Reliability"
                 value={`${g.gridState.reliability}%`}
                 warn={g.gridState.reliability < 70}
               />
+              <MiniStat
+                label="SAIDI"
+                value={`${Math.round(g.gridState.saidi)} min`}
+              />
+              <MiniStat
+                label="SAIFI"
+                value={`${g.gridState.saifi.toFixed(2)}`}
+              />
+              <MiniStat
+                label="Export >2kW"
+                value={`${g.gridState.customerEnergyExport}% time`}
+              />
+              <MiniStat
+                label="Resilience"
+                value={`${g.gridState.disasterResilience}%`}
+                warn={g.gridState.disasterResilience < 50}
+              />
+              <MiniStat
+                label="Catastrophic Fails"
+                value={`${g.gridState.catastrophicFailures}`}
+                warn={g.gridState.catastrophicFailures > 0}
+              />
             </div>
           )}
 
-          {/* Driver Health */}
-          {g.driverHealth && (
-            <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-3 mb-4">
-              <div className="grid grid-cols-5 gap-2">
-                {DRIVERS.map((d) => {
-                  const val = g.driverHealth![d.key];
-                  return (
-                    <div key={d.key} className="text-center">
-                      <div className="text-sm mb-0.5">{d.icon}</div>
-                      <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${
-                            val > 60
-                              ? "bg-emerald-500"
-                              : val > 30
-                                ? "bg-yellow-500"
-                                : "bg-red-500"
-                          }`}
-                          style={{ width: `${val}%` }}
-                        />
-                      </div>
-                      <div
-                        className={`text-xs mt-0.5 font-bold ${
-                          val > 60
-                            ? "text-emerald-400"
-                            : val > 30
-                              ? "text-yellow-400"
-                              : "text-red-400"
-                        }`}
-                      >
-                        {val}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+
 
           {/* Action Selection or Waiting */}
           {alreadySubmitted ? (
@@ -742,9 +772,6 @@ function PlayerContent() {
             <h1 className="text-3xl font-bold text-white mb-1">
               Game Complete
             </h1>
-            <div className="text-4xl font-black text-amber-400 mb-1">
-              Score: {g.score}
-            </div>
             <p className="text-slate-400 text-sm">
               {g.quarter} quarters of Western Sydney grid management
             </p>
@@ -946,42 +973,109 @@ function PlayerContent() {
             </div>
           )}
 
+          {/* Customer Satisfaction Poll */}
+          {(() => {
+            const me = data.players.find((p) => p.id === data.currentPlayerId);
+            if (!me) return null;
+
+            if (me.finalSatisfaction === null) {
+              return (
+                <div className="bg-amber-900/30 border border-amber-500/30 rounded-xl p-5 mb-4">
+                  <h2 className="text-white font-semibold mb-2">
+                    Customer Satisfaction
+                  </h2>
+                  <p className="text-slate-400 text-sm mb-4">
+                    Based on the network&apos;s performance, how satisfied are you
+                    with your service overall? (1 = Very Dissatisfied, 10 = Very Satisfied)
+                  </p>
+                  <div className="flex items-center gap-4 mb-4">
+                    <input
+                      type="range"
+                      min={1}
+                      max={10}
+                      value={satisfaction}
+                      onChange={(e) => setSatisfaction(parseInt(e.target.value))}
+                      className="w-full h-2 bg-slate-700 rounded-full appearance-none accent-amber-500"
+                    />
+                    <span className="text-amber-400 font-bold text-xl w-8 text-center">
+                      {satisfaction}
+                    </span>
+                  </div>
+                  <button
+                    onClick={submitSatisfaction}
+                    disabled={submittingSatisfaction}
+                    className="w-full py-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold rounded-lg transition-all"
+                  >
+                    {submittingSatisfaction ? "Submitting..." : "Submit Rating"}
+                  </button>
+                </div>
+              );
+            } else {
+              // Calculate average satisfaction
+              const submittedScores = data.players
+                .filter((p) => p.finalSatisfaction !== null)
+                .map((p) => p.finalSatisfaction as number);
+              const avg =
+                submittedScores.length > 0
+                  ? (
+                      submittedScores.reduce((a, b) => a + b, 0) /
+                      submittedScores.length
+                    ).toFixed(1)
+                  : "0.0";
+
+              return (
+                <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-5 mb-4 text-center">
+                  <h2 className="text-slate-400 text-sm font-semibold mb-1">
+                    Average Customer Satisfaction
+                  </h2>
+                  <div className="text-4xl font-black text-amber-400">
+                    {avg} <span className="text-lg text-slate-500">/ 10</span>
+                  </div>
+                  <p className="text-slate-500 text-xs mt-2">
+                    Based on {submittedScores.length} response{submittedScores.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+              );
+            }
+          })()}
+
           {/* Grid final state */}
           {g.gridState && (
             <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-5">
               <h2 className="text-white font-semibold mb-3">
                 Final Grid State
               </h2>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <div>
-                  <span className="text-slate-400 text-xs">Population</span>
+                  <span className="text-slate-400 text-xs">SAIDI</span>
                   <div className="text-white font-bold">
-                    {g.gridState.population.toLocaleString()}
+                    {Math.round(g.gridState.saidi)} min
                   </div>
                 </div>
                 <div>
-                  <span className="text-slate-400 text-xs">Reliability</span>
+                  <span className="text-slate-400 text-xs">SAIFI</span>
                   <div className="text-white font-bold">
-                    {g.gridState.reliability}%
+                    {g.gridState.saifi.toFixed(2)}
                   </div>
                 </div>
                 <div>
                   <span className="text-slate-400 text-xs">
-                    Capacity Margin
+                    Export &gt;2kW
                   </span>
                   <div className="text-white font-bold">
-                    {(
-                      ((g.gridState.capacity - g.gridState.demand) /
-                        g.gridState.capacity) *
-                      100
-                    ).toFixed(0)}
-                    %
+                    {g.gridState.customerEnergyExport}% time
                   </div>
                 </div>
                 <div>
-                  <span className="text-slate-400 text-xs">Satisfaction</span>
+                  <span className="text-slate-400 text-xs">Resilience</span>
                   <div className="text-white font-bold">
-                    {g.gridState.customerSatisfaction}
+                    {g.gridState.disasterResilience}%
+                  </div>
+                </div>
+                <div>
+                  <span className="text-slate-400 text-xs">Catastrophes</span>
+                  <div className="text-white font-bold">
+                    {g.gridState.catastrophicFailures}
                   </div>
                 </div>
               </div>

@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PowerGrid WSA — Western Sydney Power Grid Game",
+  title: "PowerGrid",
   description:
-    "A turn-based multiplayer game where customers build and maintain a power grid for Western Sydney's growing Aerotropolis",
+    "A turn-based multiplayer game where customers build and maintain a power grid for Western Sydney",
 };
 
 export default function RootLayout({

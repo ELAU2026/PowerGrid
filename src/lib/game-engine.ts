@@ -207,6 +207,11 @@ export function createInitialGridState(
     budget: quarterlyRevenue * 2, // start with 2 quarters of runway
     quarterlyRevenue,
     assets: createInitialAssets(),
+    saidi: 120, // Example starting value (minutes)
+    saifi: 1.5, // Example starting value
+    customerEnergyExport: 50, // 50% of the time they can export > 2kW
+    disasterResilience: 85, // 85% resilience
+    catastrophicFailures: 0,
   };
 }
 
@@ -317,6 +322,14 @@ const ACTION_TEMPLATES: ActionTemplate[] = [
     effect: { reliability: 15, innovation: 5 },
   },
   {
+    id: "commercial-flexible-loads",
+    name: "C&I Flexible Loads & Gen",
+    description: "Partner with large commercial and industrial sites to orchestrate flexible loads and behind-the-meter generation, deferring capital investment.",
+    costFraction: 0.25,
+    driver: "innovation",
+    effect: { innovation: 20, growthDemand: 10, reliability: 5 },
+  },
+  {
     id: "data-centre-connection",
     name: "Data Centre Direct Feed",
     description: "Build dedicated high-voltage connection for new data centre campus",
@@ -385,7 +398,11 @@ export function selectScenario(
   quarter: number,
   maxQuarters: number,
   usedScenarioIds: string[]
-): Scenario {
+): Scenario | null {
+  // Randomise appearance - 40% chance of no scenario this quarter
+  if (Math.random() > 0.6) {
+    return null;
+  }
   // Determine target severity based on game progression
   const progress = quarter / maxQuarters;
   const severityPool: Scenario["severity"][] =
@@ -452,6 +469,13 @@ export function applyDisasterDamage(
     catastrophic: 2,
   };
   const mult = severityMultiplier[disaster.severity] ?? 1;
+
+  if (disaster.severity === "catastrophic") {
+    newGrid.catastrophicFailures += 1;
+  }
+  newGrid.saidi += 45 * mult;
+  newGrid.saifi += 0.2 * mult;
+  newGrid.disasterResilience = Math.max(0, newGrid.disasterResilience - 10 * mult);
 
   // Damage driver health
   for (const driver of disaster.damageType) {
@@ -556,6 +580,8 @@ export function progressQuarter(
   const capacityMargin = (newGrid.capacity - newGrid.demand) / newGrid.capacity;
   if (capacityMargin < 0.05) {
     newGrid.reliability = Math.max(0, newGrid.reliability - 5);
+    newGrid.saidi += 30; // Blackouts increase SAIDI
+    newGrid.saifi += 0.5; // and SAIFI
     events.push({
       quarter,
       description: "Rolling blackouts due to insufficient capacity",
@@ -564,6 +590,7 @@ export function progressQuarter(
     });
   } else if (capacityMargin < 0.15) {
     newGrid.reliability = Math.max(0, newGrid.reliability - 2);
+    newGrid.saidi += 10;
   }
 
   // Customer satisfaction based on average driver health
@@ -645,6 +672,7 @@ export function applyAction(
     // Flexible export enables more customer DER export, slightly increasing effective capacity
     newGrid.capacity += 15;
     newGrid.reliability = Math.min(100, newGrid.reliability + 3);
+    newGrid.customerEnergyExport = Math.min(100, newGrid.customerEnergyExport + 20);
   }
   if (action.id === "cybersecurity-upgrade") {
     // Cybersecurity upgrade improves grid monitoring resilience
@@ -658,9 +686,12 @@ export function applyAction(
         : a
     );
     newGrid.reliability = Math.min(100, newGrid.reliability + 5);
+    newGrid.saidi = Math.max(0, newGrid.saidi - 10);
+    newGrid.saifi = Math.max(0, newGrid.saifi - 0.1);
   }
   if (action.id === "battery-storage") {
     newGrid.capacity += 20;
+    newGrid.customerEnergyExport = Math.min(100, newGrid.customerEnergyExport + 10);
     newGrid.assets.push({
       id: `battery-${Date.now()}`,
       name: "New Battery Storage",
@@ -699,11 +730,18 @@ export function applyAction(
   if (action.id === "demand-response") {
     newGrid.demand = Math.max(0, newGrid.demand - 20);
   }
+  if (action.id === "commercial-flexible-loads") {
+    newGrid.demand = Math.max(0, newGrid.demand - 35);
+    newGrid.capacity += 10; // Virtual capacity from behind-the-meter generation
+  }
   if (action.id === "storm-hardening") {
     newGrid.reliability = Math.min(100, newGrid.reliability + 5);
+    newGrid.disasterResilience = Math.min(100, newGrid.disasterResilience + 15);
   }
   if (action.id === "smart-grid") {
     newGrid.reliability = Math.min(100, newGrid.reliability + 5);
+    newGrid.saidi = Math.max(0, newGrid.saidi - 20);
+    newGrid.saifi = Math.max(0, newGrid.saifi - 0.2);
   }
 
   return { grid: newGrid, driverHealth: newHealth };
