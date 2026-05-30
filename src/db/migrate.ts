@@ -1,6 +1,7 @@
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
+// Standalone migration script — accessing a db property triggers lazy init + auto-migration
 import { db } from "./index";
 
-migrate(db, { migrationsFolder: "./src/db/migrations" });
+// Access a property to trigger the lazy proxy initialisation (which runs migrations)
+void db._.fullSchema;
 
 console.log("Migrations complete.");

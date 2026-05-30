@@ -15,8 +15,9 @@
 | Technology | Purpose |
 |-----------|---------|
 | SQLite | Local file-based database (sqlite.db) |
-| better-sqlite3 | Native SQLite3 driver for Node.js |
-| Drizzle ORM | Type-safe database queries (better-sqlite3 driver) |
+| bun:sqlite | Built-in SQLite driver for Bun runtime (dev/sandbox) |
+| better-sqlite3 | Native SQLite3 driver for Node.js (build/production) |
+| Drizzle ORM | Type-safe database queries (dual-runtime driver) |
 | drizzle-kit | Migration generation |
 
 ## Commands
