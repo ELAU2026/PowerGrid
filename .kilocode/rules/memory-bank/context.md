@@ -97,8 +97,8 @@ A turn-based multiplayer power grid management game set in Western Sydney. Playe
 ## Tech Stack
 
 - Next.js 16 (App Router), React 19, TypeScript 5.9
-- Tailwind CSS 4, Drizzle ORM, SQLite
-- Bun package manager
+- Tailwind CSS 4, Drizzle ORM, local SQLite (better-sqlite3)
+- Bun package manager (Next.js build/start runs under Node.js)
 - No WebSocket — uses 2-second polling for simplicity
 
 ## Session History
@@ -111,3 +111,4 @@ A turn-based multiplayer power grid management game set in Western Sydney. Playe
 | 2026-05-28 | Converted to synchronous multiplayer with server-side state, admin dashboard, player devices, behavioural economics analytics, customer segmentation |
 | 2026-05-28 | Added 14 scenario-driven turns with customer-impact narratives, responsiveness tracking, and per-scenario/per-player responsiveness analytics |
 | 2026-05-29 | Revised base actions: renamed "Upgrade Transmission Lines" → "Upgrade Lines", removed "Community Solar Installation", added "Flexible Export", "Cybersecurity Equipment Upgrade", and "Upgrade Cables & Switchgear" actions with corresponding scenario relevance and applyAction effects |
+| 2026-05-30 | Switched from @kilocode/app-builder-db (Turso/libSQL) to local SQLite via better-sqlite3 + drizzle-orm/better-sqlite3. Migration runner uses tsx. DB file at sqlite.db (gitignored). |

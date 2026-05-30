@@ -1,4 +1,6 @@
-import { runMigrations } from "@kilocode/app-builder-db";
+import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { db } from "./index";
 
-await runMigrations(db, {}, { migrationsFolder: "./src/db/migrations" });
+migrate(db, { migrationsFolder: "./src/db/migrations" });
+
+console.log("Migrations complete.");

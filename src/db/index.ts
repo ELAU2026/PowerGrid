@@ -1,15 +1,11 @@
-import { createDatabase } from "@kilocode/app-builder-db";
+import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema";
+import path from "path";
 
-type Database = ReturnType<typeof createDatabase<typeof schema>>;
+const dbPath = process.env.DB_PATH || path.join(process.cwd(), "sqlite.db");
 
-let _db: Database | null = null;
+const sqlite = new Database(dbPath);
+sqlite.pragma("journal_mode = WAL");
 
-export const db: Database = new Proxy({} as Database, {
-  get(_target, prop, receiver) {
-    if (!_db) {
-      _db = createDatabase(schema);
-    }
-    return Reflect.get(_db, prop, receiver);
-  },
-});
+export const db = drizzle(sqlite, { schema });

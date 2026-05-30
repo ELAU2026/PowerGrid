@@ -14,10 +14,10 @@
 
 | Technology | Purpose |
 |-----------|---------|
-| SQLite | Database (via sandbox env) |
-| Drizzle ORM | Type-safe database queries |
+| SQLite | Local file-based database (sqlite.db) |
+| better-sqlite3 | Native SQLite3 driver for Node.js |
+| Drizzle ORM | Type-safe database queries (better-sqlite3 driver) |
 | drizzle-kit | Migration generation |
-| @kilocode/app-builder-db | Database client factory |
 
 ## Commands
 
@@ -28,7 +28,7 @@
 | `bun lint` | ESLint |
 | `bun typecheck` | TypeScript checking |
 | `bun db:generate` | Generate DB migrations |
-| `bun db:migrate` | Run migrations (sandbox only) |
+| `bun db:migrate` | Run migrations (uses tsx under Node.js) |
 
 ## Configuration
 
@@ -36,7 +36,7 @@
 - TypeScript: strict mode
 - Tailwind: CSS-first v4 config
 - ESLint: flat config
-- DB credentials: auto-provided by sandbox (`DB_URL`, `DB_TOKEN`)
+- DB path: configurable via `DB_PATH` env var, defaults to `./sqlite.db`
 
 ## Key Patterns
 
